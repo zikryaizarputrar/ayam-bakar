@@ -49,6 +49,22 @@
             margin-top: 15px;
             line-height: 1.4;
         }
+        /* Label status drag */
+        #drag-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 170, 0, 0.85);
+            color: #111;
+            font-weight: bold;
+            font-size: 13px;
+            padding: 8px 18px;
+            border-radius: 20px;
+            pointer-events: none;
+            display: none;
+            transition: opacity 0.2s;
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -63,17 +79,26 @@
         <button onclick="clearScene()" style="background: #ff4f4f;">Hapus Semua</button>
         
         <div class="instruction">
-            <strong>Navigasi:</strong><br>
+            <strong>Navigasi Kamera:</strong><br>
             • Klik kiri + Geser: Putar Kamera<br>
             • Klik kanan + Geser: Geser Kamera<br>
-            • Scroll: Zoom In/Out
+            • Scroll: Zoom In/Out<br><br>
+            <strong>Memindahkan Objek:</strong><br>
+            • Klik objek (kuning) lalu geser<br>
+            • Snap otomatis ke grid 0.5 unit<br>
+            • Lepas klik untuk menempatkan
         </div>
     </div>
+
+    <!-- Indikator saat objek sedang di-drag -->
+    <div id="drag-hint">✦ Sedang Memindahkan Objek...</div>
 
     <div id="canvas-container"></div>
 
     <script>
+        // ============================================================
         // 1. Setup Scene, Kamera, dan Renderer
+        // ============================================================
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1e1e1e);
@@ -86,13 +111,17 @@
         renderer.shadowMap.enabled = true;
         container.appendChild(renderer.domElement);
 
+        // ============================================================
         // 2. Kontrol Kamera (OrbitControls)
+        // ============================================================
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.01; // Mencegah kamera masuk ke bawah tanah
+        controls.maxPolarAngle = Math.PI / 2 - 0.01;
 
+        // ============================================================
         // 3. Pencahayaan (Lighting)
+        // ============================================================
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -101,7 +130,9 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 4. Lantai Grid (Helper untuk Arsitek)
+        // ============================================================
+        // 4. Lantai Grid
+        // ============================================================
         const gridHelper = new THREE.GridHelper(30, 30, 0x4fa8ff, 0x444444);
         gridHelper.position.y = 0.01;
         scene.add(gridHelper);
@@ -113,36 +144,43 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Array untuk menyimpan objek arsitektur yang dibuat
+        // Array untuk menyimpan objek arsitektur
         let objects = [];
 
-        // 5. Fungsi Fungsi untuk Menambah Objek
+        // ============================================================
+        // 5. Fungsi Menambah Objek
+        // ============================================================
         function addWall() {
-            // Membuat dinding standar (Tebal: 0.2, Tinggi: 2.5, Panjang: 5)
             const geometry = new THREE.BoxGeometry(5, 2.5, 0.2);
             const material = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5 });
             const wall = new THREE.Mesh(geometry, material);
-            
-            // Set posisi di atas lantai dan sedikit acak agar tidak menumpuk
-            wall.position.set((Math.random() - 0.5) * 5, 1.25, (Math.random() - 0.5) * 5);
+            wall.userData.type = 'wall';
+            wall.userData.originalColor = 0xdddddd;
+            wall.position.set(
+                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5,
+                1.25,
+                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5
+            );
             wall.castShadow = true;
             wall.receiveShadow = true;
-            
             scene.add(wall);
             objects.push(wall);
         }
 
         function addRoom() {
-            // Membuat struktur ruangan/kubus kosong kasar (Ukuran 4x4x3)
             const geometry = new THREE.BoxGeometry(4, 3, 4);
-            const material = new THREE.MeshStandardMaterial({ 
-                color: 0x4fa8ff, 
-                wireframe: true, // Berbentuk wireframe agar transparan seperti blueprint
-                linewidth: 2 
+            const material = new THREE.MeshStandardMaterial({
+                color: 0x4fa8ff,
+                wireframe: true
             });
             const room = new THREE.Mesh(geometry, material);
-            
-            room.position.set((Math.random() - 0.5) * 5, 1.5, (Math.random() - 0.5) * 5);
+            room.userData.type = 'room';
+            room.userData.originalColor = 0x4fa8ff;
+            room.position.set(
+                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5,
+                1.5,
+                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5
+            );
             scene.add(room);
             objects.push(room);
         }
@@ -152,15 +190,166 @@
             objects = [];
         }
 
-        // 6. Responsive Window
-        window.addEventListener('resize', onWindowResize, false);
-        function onWindowResize() {
+        // ============================================================
+        // 6. DragController — memindahkan objek di atas floor plane
+        // ============================================================
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2();
+
+        // Floor plane invisible di y=0, digunakan untuk proyeksi ray
+        const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+        const planeIntersectPoint = new THREE.Vector3();
+
+        // State drag
+        let dragTarget    = null;   // objek yang sedang di-drag
+        let originalColor = null;   // warna asli sebelum highlight
+        let dragOffset    = new THREE.Vector2(); // offset kursor ke posisi objek
+
+        const dragHint = document.getElementById('drag-hint');
+
+        /**
+         * Hitung NDC (Normalized Device Coordinates) dari event mouse/touch.
+         */
+        function getNDC(clientX, clientY) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            return new THREE.Vector2(
+                ((clientX - rect.left) / rect.width)  *  2 - 1,
+                ((clientY - rect.top)  / rect.height) * -2 + 1
+            );
+        }
+
+        /**
+         * Snap nilai ke kelipatan 0.5, lalu clamp ke [-14, 14].
+         */
+        function snapClamp(value) {
+            return Math.max(-14, Math.min(14, Math.round(value / 0.5) * 0.5));
+        }
+
+        /**
+         * Mulai drag: cek apakah ada objek di bawah kursor.
+         */
+        function onDragStart(clientX, clientY) {
+            // Jika sudah ada drag aktif, abaikan
+            if (dragTarget) return;
+
+            pointer.copy(getNDC(clientX, clientY));
+            raycaster.setFromCamera(pointer, camera);
+
+            const hits = raycaster.intersectObjects(objects);
+            if (hits.length === 0) return; // klik di ruang kosong → biarkan OrbitControls
+
+            dragTarget = hits[0].object;
+            originalColor = dragTarget.material.color.getHex();
+
+            // Highlight kuning
+            dragTarget.material.color.setHex(0xffaa00);
+
+            // Hitung offset: posisi objek dikurangi titik intersect di floor plane
+            raycaster.ray.intersectPlane(floorPlane, planeIntersectPoint);
+            dragOffset.set(
+                dragTarget.position.x - planeIntersectPoint.x,
+                dragTarget.position.z - planeIntersectPoint.z
+            );
+
+            // Matikan kamera agar tidak berebut event
+            controls.enabled = false;
+            renderer.domElement.style.cursor = 'grabbing';
+            dragHint.style.display = 'block';
+        }
+
+        /**
+         * Saat drag bergerak: update posisi objek.
+         */
+        function onDragMove(clientX, clientY) {
+            if (!dragTarget) return;
+
+            pointer.copy(getNDC(clientX, clientY));
+            raycaster.setFromCamera(pointer, camera);
+
+            // Cek apakah ray berpotongan dengan floor plane
+            if (!raycaster.ray.intersectPlane(floorPlane, planeIntersectPoint)) return;
+
+            // Terapkan offset, snap, dan clamp
+            dragTarget.position.x = snapClamp(planeIntersectPoint.x + dragOffset.x);
+            dragTarget.position.z = snapClamp(planeIntersectPoint.z + dragOffset.y);
+            // position.y TIDAK diubah agar objek tetap di atas lantai
+        }
+
+        /**
+         * Akhiri drag: pulihkan warna dan aktifkan kembali kamera.
+         */
+        function onDragEnd() {
+            if (!dragTarget) return;
+
+            dragTarget.material.color.setHex(originalColor);
+            dragTarget = null;
+            originalColor = null;
+
+            controls.enabled = true;
+            renderer.domElement.style.cursor = 'default';
+            dragHint.style.display = 'none';
+        }
+
+        // ── Mouse events ──────────────────────────────────────────────
+        renderer.domElement.addEventListener('mousedown', (e) => {
+            if (e.button !== 0) return; // hanya tombol kiri
+            onDragStart(e.clientX, e.clientY);
+        });
+
+        renderer.domElement.addEventListener('mousemove', (e) => {
+            onDragMove(e.clientX, e.clientY);
+
+            // Ubah kursor saat hover di atas objek (tanpa drag aktif)
+            if (!dragTarget) {
+                pointer.copy(getNDC(e.clientX, e.clientY));
+                raycaster.setFromCamera(pointer, camera);
+                const hits = raycaster.intersectObjects(objects);
+                renderer.domElement.style.cursor = hits.length > 0 ? 'grab' : 'default';
+            }
+        });
+
+        renderer.domElement.addEventListener('mouseup', (e) => {
+            if (e.button !== 0) return;
+            onDragEnd();
+        });
+
+        // Jika kursor keluar dari canvas saat drag, hentikan drag
+        renderer.domElement.addEventListener('mouseleave', () => {
+            onDragEnd();
+        });
+
+        // ── Touch events ──────────────────────────────────────────────
+        renderer.domElement.addEventListener('touchstart', (e) => {
+            if (e.touches.length === 1) {
+                onDragStart(e.touches[0].clientX, e.touches[0].clientY);
+            }
+        }, { passive: true });
+
+        renderer.domElement.addEventListener('touchmove', (e) => {
+            if (e.touches.length === 1) {
+                onDragMove(e.touches[0].clientX, e.touches[0].clientY);
+            } else if (e.touches.length >= 2 && dragTarget) {
+                // Multi-touch: batalkan drag, izinkan pinch-zoom
+                onDragEnd();
+            }
+        }, { passive: true });
+
+        renderer.domElement.addEventListener('touchend', () => {
+            onDragEnd();
+        }, { passive: true });
+
+        // ============================================================
+        // 7. Responsive Window
+        // ============================================================
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+        });
 
-        // 7. Animation Loop
+        // ============================================================
+        // 8. Animation Loop
+        // ============================================================
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
