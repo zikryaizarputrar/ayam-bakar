@@ -49,22 +49,6 @@
             margin-top: 15px;
             line-height: 1.4;
         }
-        /* Label status pilih/pindah */
-        #drag-hint {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 170, 0, 0.9);
-            color: #111;
-            font-weight: bold;
-            font-size: 13px;
-            padding: 8px 18px;
-            border-radius: 20px;
-            pointer-events: none;
-            display: none;
-            white-space: nowrap;
-        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -77,27 +61,19 @@
         <button onclick="addWall()">+ Tambah Dinding</button>
         <button onclick="addRoom()">+ Tambah Ruangan Kubus</button>
         <button onclick="clearScene()" style="background: #ff4f4f;">Hapus Semua</button>
-        
+
         <div class="instruction">
-            <strong>Navigasi Kamera:</strong><br>
+            <strong>Navigasi:</strong><br>
             • Klik kiri + Geser: Putar Kamera<br>
-            • Scroll: Zoom In/Out<br><br>
-            <strong>Memindahkan Objek:</strong><br>
-            • Klik kiri objek → pilih (kuning)<br>
-            • Klik kanan di lantai → pindah ke sana<br>
-            • Klik kiri objek lagi → batalkan pilihan
+            • Klik kanan + Geser: Geser Kamera<br>
+            • Scroll: Zoom In/Out
         </div>
     </div>
-
-    <!-- Indikator saat objek dipilih -->
-    <div id="drag-hint">✦ Objek dipilih — Klik kanan di lantai untuk memindahkan</div>
 
     <div id="canvas-container"></div>
 
     <script>
-        // ============================================================
         // 1. Setup Scene, Kamera, dan Renderer
-        // ============================================================
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x1e1e1e);
@@ -110,17 +86,13 @@
         renderer.shadowMap.enabled = true;
         container.appendChild(renderer.domElement);
 
-        // ============================================================
         // 2. Kontrol Kamera (OrbitControls)
-        // ============================================================
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
         controls.maxPolarAngle = Math.PI / 2 - 0.01;
 
-        // ============================================================
         // 3. Pencahayaan (Lighting)
-        // ============================================================
         const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
@@ -129,9 +101,7 @@
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // ============================================================
         // 4. Lantai Grid
-        // ============================================================
         const gridHelper = new THREE.GridHelper(30, 30, 0x4fa8ff, 0x444444);
         gridHelper.position.y = 0.01;
         scene.add(gridHelper);
@@ -143,23 +113,15 @@
         floor.receiveShadow = true;
         scene.add(floor);
 
-        // Array untuk menyimpan objek arsitektur
+        // Array untuk menyimpan objek arsitektur yang dibuat
         let objects = [];
 
-        // ============================================================
-        // 5. Fungsi Menambah Objek
-        // ============================================================
+        // 5. Fungsi untuk Menambah Objek
         function addWall() {
             const geometry = new THREE.BoxGeometry(5, 2.5, 0.2);
             const material = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5 });
             const wall = new THREE.Mesh(geometry, material);
-            wall.userData.type = 'wall';
-            wall.userData.originalColor = 0xdddddd;
-            wall.position.set(
-                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5,
-                1.25,
-                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5
-            );
+            wall.position.set((Math.random() - 0.5) * 5, 1.25, (Math.random() - 0.5) * 5);
             wall.castShadow = true;
             wall.receiveShadow = true;
             scene.add(wall);
@@ -170,16 +132,11 @@
             const geometry = new THREE.BoxGeometry(4, 3, 4);
             const material = new THREE.MeshStandardMaterial({
                 color: 0x4fa8ff,
-                wireframe: true
+                wireframe: true,
+                linewidth: 2
             });
             const room = new THREE.Mesh(geometry, material);
-            room.userData.type = 'room';
-            room.userData.originalColor = 0x4fa8ff;
-            room.position.set(
-                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5,
-                1.5,
-                Math.round((Math.random() - 0.5) * 10 / 0.5) * 0.5
-            );
+            room.position.set((Math.random() - 0.5) * 5, 1.5, (Math.random() - 0.5) * 5);
             scene.add(room);
             objects.push(room);
         }
@@ -189,157 +146,14 @@
             objects = [];
         }
 
-        // ============================================================
-        // 6. SelectMoveController — pilih dengan klik kiri, pindah dengan klik kanan
-        // ============================================================
-        const raycaster = new THREE.Raycaster();
-        const pointer   = new THREE.Vector2();
-
-        // Floor plane di y=0 untuk proyeksi posisi tujuan
-        const floorPlane        = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
-        const planeIntersectPt  = new THREE.Vector3();
-
-        // State seleksi
-        let selectedObject  = null;   // objek yang sedang dipilih
-        let selectedOrigColor = null; // warna asli sebelum highlight
-
-        const dragHint = document.getElementById('drag-hint');
-
-        /** Hitung NDC dari koordinat layar */
-        function getNDC(clientX, clientY) {
-            const rect = renderer.domElement.getBoundingClientRect();
-            return new THREE.Vector2(
-                ((clientX - rect.left) / rect.width)  *  2 - 1,
-                ((clientY - rect.top)  / rect.height) * -2 + 1
-            );
-        }
-
-        /** Snap ke 0.5 unit dan clamp ke [-14, 14] */
-        function snapClamp(value) {
-            return Math.max(-14, Math.min(14, Math.round(value / 0.5) * 0.5));
-        }
-
-        /** Batalkan pilihan objek yang sedang aktif */
-        function deselect() {
-            if (!selectedObject) return;
-            selectedObject.material.color.setHex(selectedOrigColor);
-            selectedObject = null;
-            selectedOrigColor = null;
-            controls.enabled = true;
-            renderer.domElement.style.cursor = 'default';
-            dragHint.style.display = 'none';
-        }
-
-        // ── Klik KIRI: pilih atau batalkan pilihan objek ──────────────
-        renderer.domElement.addEventListener('mousedown', (e) => {
-            if (e.button !== 0) return;
-
-            pointer.copy(getNDC(e.clientX, e.clientY));
-            raycaster.setFromCamera(pointer, camera);
-            const hits = raycaster.intersectObjects(objects);
-
-            if (hits.length > 0) {
-                const clicked = hits[0].object;
-
-                if (selectedObject === clicked) {
-                    // Klik objek yang sama → batalkan pilihan
-                    deselect();
-                } else {
-                    // Batalkan pilihan lama dulu (jika ada)
-                    deselect();
-
-                    // Pilih objek baru
-                    selectedObject    = clicked;
-                    selectedOrigColor = clicked.material.color.getHex();
-                    clicked.material.color.setHex(0xffaa00); // highlight kuning
-
-                    // Nonaktifkan kamera saat objek terpilih agar klik kanan tidak pan
-                    controls.enabled = false;
-                    renderer.domElement.style.cursor = 'crosshair';
-                    dragHint.style.display = 'block';
-                }
-                // Hentikan propagasi agar OrbitControls tidak ikut merespons
-                e.stopImmediatePropagation();
-            } else {
-                // Klik di ruang kosong dengan klik kiri → batalkan pilihan
-                // tapi biarkan OrbitControls bekerja (tidak di-stop)
-                deselect();
-            }
-        }, true); // capture phase agar lebih prioritas dari OrbitControls
-
-        // ── Klik KANAN: pindahkan objek terpilih ke titik lantai ─────
-        renderer.domElement.addEventListener('contextmenu', (e) => {
-            e.preventDefault(); // matikan menu konteks browser
-
-            if (!selectedObject) return;
-
-            pointer.copy(getNDC(e.clientX, e.clientY));
-            raycaster.setFromCamera(pointer, camera);
-
-            if (!raycaster.ray.intersectPlane(floorPlane, planeIntersectPt)) return;
-
-            // Pindahkan objek ke titik tujuan (snap + clamp), y tetap
-            selectedObject.position.x = snapClamp(planeIntersectPt.x);
-            selectedObject.position.z = snapClamp(planeIntersectPt.z);
-            // position.y tidak diubah
-
-            // Setelah pindah, objek tetap terpilih agar bisa dipindah lagi
-        });
-
-        // ── Hover: ubah kursor saat di atas objek ────────────────────
-        renderer.domElement.addEventListener('mousemove', (e) => {
-            if (selectedObject) return; // sudah ada pilihan, kursor tetap crosshair
-            pointer.copy(getNDC(e.clientX, e.clientY));
-            raycaster.setFromCamera(pointer, camera);
-            const hits = raycaster.intersectObjects(objects);
-            renderer.domElement.style.cursor = hits.length > 0 ? 'pointer' : 'default';
-        });
-
-        // ── Touch: tap untuk pilih, tap kedua untuk pindah ───────────
-        let touchSelectedObject = null; // status touch terpisah
-
-        renderer.domElement.addEventListener('touchstart', (e) => {
-            if (e.touches.length !== 1) {
-                deselect();
-                return;
-            }
-            const t = e.touches[0];
-            pointer.copy(getNDC(t.clientX, t.clientY));
-            raycaster.setFromCamera(pointer, camera);
-            const hits = raycaster.intersectObjects(objects);
-
-            if (hits.length > 0) {
-                const tapped = hits[0].object;
-                if (selectedObject === tapped) {
-                    deselect();
-                } else {
-                    deselect();
-                    selectedObject    = tapped;
-                    selectedOrigColor = tapped.material.color.getHex();
-                    tapped.material.color.setHex(0xffaa00);
-                    controls.enabled = false;
-                    dragHint.style.display = 'block';
-                }
-            } else if (selectedObject) {
-                // Tap di lantai kosong → pindahkan
-                raycaster.ray.intersectPlane(floorPlane, planeIntersectPt);
-                selectedObject.position.x = snapClamp(planeIntersectPt.x);
-                selectedObject.position.z = snapClamp(planeIntersectPt.z);
-            }
-        }, { passive: true });
-
-        // ============================================================
-        // 7. Responsive Window
-        // ============================================================
+        // 6. Responsive Window
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
 
-        // ============================================================
-        // 8. Animation Loop
-        // ============================================================
+        // 7. Animation Loop
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
