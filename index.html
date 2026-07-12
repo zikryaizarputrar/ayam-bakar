@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Architecture Planner</title>
+    <title>Fighter Jet 3D Model Viewer</title>
     <style>
         body {
             margin: 0;
@@ -18,58 +18,12 @@
             height: 100vh;
             display: block;
         }
-        #ui-panel {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            background: rgba(30, 30, 30, 0.85);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-            backdrop-filter: blur(10px);
-            max-width: 250px;
-        }
-        h3 { margin-top: 0; color: #4fa8ff; }
-        button {
-            width: 100%;
-            padding: 10px;
-            margin: 5px 0;
-            background: #4fa8ff;
-            border: none;
-            color: white;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-        button:hover { background: #2f89e0; }
-        .instruction {
-            font-size: 12px;
-            color: #aaa;
-            margin-top: 15px;
-            line-height: 1.4;
-        }
+
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
-
-    <div id="ui-panel">
-        <h3>Architect 3D v1.0</h3>
-        <p>Tambah Elemen:</p>
-        <button onclick="addWall()">+ Tambah Dinding</button>
-        <button onclick="addRoom()">+ Tambah Ruangan Kubus</button>
-        <button onclick="addPlane()">🛩 Tambah Jet Tempur</button>
-        <button onclick="clearScene()" style="background: #ff4f4f;">Hapus Semua</button>
-
-        <div class="instruction">
-            <strong>Navigasi:</strong><br>
-            • Klik kiri + Geser: Putar Kamera<br>
-            • Klik kanan + Geser: Geser Kamera<br>
-            • Scroll: Zoom In/Out
-        </div>
-    </div>
 
     <div id="canvas-container"></div>
 
@@ -77,10 +31,10 @@
         // 1. Setup Scene, Kamera, dan Renderer
         const container = document.getElementById('canvas-container');
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x1e1e1e);
+        scene.background = new THREE.Color(0x87ceeb);  // Sky blue background
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(10, 15, 15);
+        camera.position.set(8, 2, 6);  // Better angle to view jet
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
@@ -91,66 +45,25 @@
         const controls = new THREE.OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI / 2 - 0.01;
+        controls.maxPolarAngle = Math.PI;  // Allow full rotation
 
-        // 3. Pencahayaan (Lighting)
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+        // 3. Pencahayaan (Lighting) — Enhanced for jet visibility
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
         scene.add(ambientLight);
 
-        const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        dirLight.position.set(20, 40, 20);
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
+        dirLight.position.set(10, 20, 10);
         dirLight.castShadow = true;
         scene.add(dirLight);
 
-        // 4. Lantai Grid
-        const gridHelper = new THREE.GridHelper(30, 30, 0x4fa8ff, 0x444444);
-        gridHelper.position.y = 0.01;
-        scene.add(gridHelper);
-
-        const floorGeometry = new THREE.PlaneGeometry(30, 30);
-        const floorMaterial = new THREE.MeshStandardMaterial({ color: 0x2e2e2e, roughness: 0.8 });
-        const floor = new THREE.Mesh(floorGeometry, floorMaterial);
-        floor.rotation.x = -Math.PI / 2;
-        floor.receiveShadow = true;
-        scene.add(floor);
-
-        // Array untuk menyimpan objek arsitektur yang dibuat
-        let objects = [];
-
-        // 5. Fungsi untuk Menambah Objek
-        function addWall() {
-            const geometry = new THREE.BoxGeometry(5, 2.5, 0.2);
-            const material = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.5 });
-            const wall = new THREE.Mesh(geometry, material);
-            wall.position.set((Math.random() - 0.5) * 5, 1.25, (Math.random() - 0.5) * 5);
-            wall.castShadow = true;
-            wall.receiveShadow = true;
-            scene.add(wall);
-            objects.push(wall);
-        }
-
-        function addRoom() {
-            const geometry = new THREE.BoxGeometry(4, 3, 4);
-            const material = new THREE.MeshStandardMaterial({
-                color: 0x4fa8ff,
-                wireframe: true,
-                linewidth: 2
-            });
-            const room = new THREE.Mesh(geometry, material);
-            room.position.set((Math.random() - 0.5) * 5, 1.5, (Math.random() - 0.5) * 5);
-            scene.add(room);
-            objects.push(room);
-        }
-
-        function clearScene() {
-            objects.forEach(obj => scene.remove(obj));
-            objects = [];
-        }
+        const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
+        backLight.position.set(-10, 10, -10);
+        scene.add(backLight);
 
         // ============================================================
         // Model Jet Tempur Detail — Highly Realistic Fighter (F-22/F-35 style)
         // ============================================================
-        function addPlane() {
+        function createJet() {
             const group = new THREE.Group();
 
             // ── MATERIALS ─────────────────────────────────────────────
@@ -159,21 +72,21 @@
             const darkMat      = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.4,  metalness: 0.5  });
             const intakeMat    = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.6,  metalness: 0.4  });
             const nozzleMat    = new THREE.MeshStandardMaterial({ color: 0x1a2233, roughness: 0.25, metalness: 0.92 });
-            const glassMat     = new THREE.MeshStandardMaterial({ color: 0x44aaee, roughness: 0.0,  metalness: 0.1,  transparent: true, opacity: 0.4  });
-            const hudMat       = new THREE.MeshStandardMaterial({ color: 0x44ffaa, roughness: 0.0,  metalness: 0.0,  transparent: true, opacity: 0.30 });
+            const glassMat     = new THREE.MeshStandardMaterial({ color: 0x44aaee, roughness: 0.0,  metalness: 0.1  });
+            const hudMat       = new THREE.MeshStandardMaterial({ color: 0x44ffaa, roughness: 0.0,  metalness: 0.0  });
             const seatMat      = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.6,  metalness: 0.3  });
             const tireMat      = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.95, metalness: 0.0  });
             const gearMat      = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.25, metalness: 0.9  });
             const missileMat   = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.4,  metalness: 0.6  });
             const missileTip   = new THREE.MeshStandardMaterial({ color: 0xcc3300, roughness: 0.3,  metalness: 0.2  });
-            const afterburnMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.2,  metalness: 0.1,  emissive: 0xff3300, emissiveIntensity: 1.1, transparent: true, opacity: 0.85 });
-            const innerGlowMat = new THREE.MeshStandardMaterial({ color: 0xffee00, roughness: 0.1,  metalness: 0.0,  emissive: 0xffaa00, emissiveIntensity: 1.5, transparent: true, opacity: 0.65 });
-            const hazeRingMat  = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.05, metalness: 0.0,  transparent: true, opacity: 0.15 });
+            const afterburnMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.2,  metalness: 0.1,  emissive: 0xff3300, emissiveIntensity: 1.1 });
+            const innerGlowMat = new THREE.MeshStandardMaterial({ color: 0xffee00, roughness: 0.1,  metalness: 0.0,  emissive: 0xffaa00, emissiveIntensity: 1.5 });
+            const hazeRingMat  = new THREE.MeshStandardMaterial({ color: 0xffd080, roughness: 0.05, metalness: 0.0  });
             const accentMat    = new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.4,  metalness: 0.3  });
             const whiteMat     = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5,  metalness: 0.0  });
             const blueMat      = new THREE.MeshStandardMaterial({ color: 0x0033aa, roughness: 0.5,  metalness: 0.0  });
             const panelMat     = new THREE.MeshStandardMaterial({ color: 0x6a7a89, roughness: 0.35, metalness: 0.55 });
-            const formMat      = new THREE.MeshStandardMaterial({ color: 0x88ff88, roughness: 0.2,  metalness: 0.0,  emissive: 0x44ff44, emissiveIntensity: 0.6, transparent: true, opacity: 0.7 });
+            const formMat      = new THREE.MeshStandardMaterial({ color: 0x88ff88, roughness: 0.2,  metalness: 0.0,  emissive: 0x44ff44, emissiveIntensity: 0.6 });
             const redLightMat  = new THREE.MeshStandardMaterial({ color: 0xff2200, emissive: 0xff0000, emissiveIntensity: 1.2 });
             const greenLightMat= new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff22, emissiveIntensity: 1.2 });
             const whiteLightMat= new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.5 });
@@ -861,12 +774,8 @@
             });
 
             // ── 10. POSITION & ADD TO SCENE ───────────────────────────
-            group.position.set(
-                (Math.random() - 0.5) * 8,
-                1.05,
-                (Math.random() - 0.5) * 8
-            );
-            group.rotation.y = Math.random() * Math.PI * 2;
+            group.position.set(0, 0, 0);
+            group.rotation.y = 0;
 
             group.traverse(c => {
                 if (c.isMesh) {
@@ -876,8 +785,11 @@
             });
 
             scene.add(group);
-            objects.push(group);
+            return group;
         }
+
+        // Create jet automatically on load and keep reference for rotation
+        const jet = createJet();
 
         // 6. Responsive Window
         window.addEventListener('resize', () => {
@@ -890,6 +802,8 @@
         function animate() {
             requestAnimationFrame(animate);
             controls.update();
+            // Auto-rotate jet slowly around Y axis
+            jet.rotation.y += 0.005;
             renderer.render(scene, camera);
         }
         animate();
