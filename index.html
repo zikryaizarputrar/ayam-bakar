@@ -193,24 +193,38 @@
             // The lathe rotates around the Y axis, then we tilt it so X is the
             // longitudinal axis of the jet.
             const fusePts = [
-                new THREE.Vector2(0.000, 0.006), // sharp nose tip
-                new THREE.Vector2(0.10,  0.055), // nose taper start
-                new THREE.Vector2(0.28,  0.130), // nose cone lower shoulder
-                new THREE.Vector2(0.55,  0.195), // radar dome base
-                new THREE.Vector2(0.90,  0.240), // nose barrel
-                new THREE.Vector2(1.40,  0.268), // forward fuselage
-                new THREE.Vector2(2.10,  0.278), // widest forward section
-                new THREE.Vector2(2.80,  0.282), // under-cockpit max width
-                new THREE.Vector2(3.50,  0.280), // intake region
-                new THREE.Vector2(4.20,  0.275), // mid fuselage
-                new THREE.Vector2(4.80,  0.272), // wing root join
-                new THREE.Vector2(5.40,  0.278), // aft mid
-                new THREE.Vector2(5.90,  0.290), // engine bay widening
-                new THREE.Vector2(6.30,  0.302), // max engine width
-                new THREE.Vector2(6.60,  0.290), // nozzle taper start
-                new THREE.Vector2(6.85,  0.240), // nozzle narrowing
-                new THREE.Vector2(7.05,  0.175), // nozzle exit
-                new THREE.Vector2(7.20,  0.120), // tail boat-tail
+                // ── Nose cone: very sharp radar dome taper (F-22 style ogive) ──
+                new THREE.Vector2(0.000, 0.004), // needle nose tip
+                new THREE.Vector2(0.055, 0.022), // nose point 2
+                new THREE.Vector2(0.130, 0.055), // nose point 3
+                new THREE.Vector2(0.240, 0.098), // nose cone mid
+                new THREE.Vector2(0.400, 0.148), // radar dome shoulder
+                new THREE.Vector2(0.600, 0.188), // radar dome base
+                // ── Smooth expansion to cockpit ──────────────────────
+                new THREE.Vector2(0.900, 0.218), // forward nose barrel
+                new THREE.Vector2(1.300, 0.248), // pre-cockpit widening
+                new THREE.Vector2(1.800, 0.266), // cockpit sill region
+                new THREE.Vector2(2.300, 0.272), // cockpit lateral max
+                // ── Flatter cross-section mid-fuselage (stealth chisel) ─
+                new THREE.Vector2(2.900, 0.274), // post-cockpit plateau
+                new THREE.Vector2(3.500, 0.270), // intake region start
+                new THREE.Vector2(4.000, 0.265), // mid-fuselage flat zone
+                // ── Area-rule waist / Whitcomb narrowing at wing root ──
+                new THREE.Vector2(4.400, 0.258), // waist start
+                new THREE.Vector2(4.700, 0.250), // waist minimum (coke-bottle)
+                new THREE.Vector2(5.000, 0.255), // waist recovery
+                // ── Wider engine bay / intake expansion ──────────────
+                new THREE.Vector2(5.350, 0.268), // aft fuselage expansion
+                new THREE.Vector2(5.700, 0.282), // engine bay widening
+                new THREE.Vector2(6.000, 0.296), // engine bay mid
+                new THREE.Vector2(6.250, 0.308), // max engine girth
+                // ── Smooth boat-tail taper to nozzle exit ────────────
+                new THREE.Vector2(6.480, 0.298), // nozzle convergence start
+                new THREE.Vector2(6.650, 0.272), // nozzle narrowing
+                new THREE.Vector2(6.800, 0.238), // nozzle throat
+                new THREE.Vector2(6.930, 0.196), // nozzle divergent section
+                new THREE.Vector2(7.070, 0.152), // nozzle exit plane
+                new THREE.Vector2(7.200, 0.112), // tail boat-tail terminus
             ];
             const fuselage = sh(new THREE.Mesh(
                 new THREE.LatheGeometry(fusePts, 24), bodyMat));
