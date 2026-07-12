@@ -60,6 +60,7 @@
         <p>Tambah Elemen:</p>
         <button onclick="addWall()">+ Tambah Dinding</button>
         <button onclick="addRoom()">+ Tambah Ruangan Kubus</button>
+        <button onclick="addPlane()">✈ Tambah Pesawat</button>
         <button onclick="clearScene()" style="background: #ff4f4f;">Hapus Semua</button>
 
         <div class="instruction">
@@ -144,6 +145,110 @@
         function clearScene() {
             objects.forEach(obj => scene.remove(obj));
             objects = [];
+        }
+
+        // Fungsi membuat model pesawat dari geometri Three.js
+        function addPlane() {
+            const group = new THREE.Group();
+
+            // Warna utama pesawat
+            const bodyMat  = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.4, metalness: 0.3 });
+            const wingMat  = new THREE.MeshStandardMaterial({ color: 0xaaaacc, roughness: 0.4, metalness: 0.3 });
+            const engineMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.5 });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0x88ccff, roughness: 0.1, metalness: 0.1, transparent: true, opacity: 0.7 });
+
+            // --- Badan utama (fuselage) ---
+            const bodyGeo = new THREE.CylinderGeometry(0.35, 0.2, 4, 12);
+            const body = new THREE.Mesh(bodyGeo, bodyMat);
+            body.rotation.z = Math.PI / 2; // baring horizontal
+            group.add(body);
+
+            // --- Hidung pesawat ---
+            const noseGeo = new THREE.ConeGeometry(0.35, 1.2, 12);
+            const nose = new THREE.Mesh(noseGeo, bodyMat);
+            nose.rotation.z = -Math.PI / 2;
+            nose.position.set(2.6, 0, 0);
+            group.add(nose);
+
+            // --- Kaca kokpit ---
+            const cockpitGeo = new THREE.SphereGeometry(0.28, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+            const cockpit = new THREE.Mesh(cockpitGeo, glassMat);
+            cockpit.position.set(1.4, 0.28, 0);
+            group.add(cockpit);
+
+            // --- Sayap utama (kiri & kanan) ---
+            const mainWingGeo = new THREE.BoxGeometry(1.8, 0.08, 4.5);
+            const mainWing = new THREE.Mesh(mainWingGeo, wingMat);
+            mainWing.position.set(-0.2, -0.05, 0);
+            group.add(mainWing);
+
+            // Ujung sayap sedikit miring (winglet kiri)
+            const wingletGeo = new THREE.BoxGeometry(0.5, 0.4, 0.08);
+            const wingletL = new THREE.Mesh(wingletGeo, wingMat);
+            wingletL.position.set(-0.2, 0.15, 2.25);
+            wingletL.rotation.x = 0.15;
+            group.add(wingletL);
+
+            // Winglet kanan
+            const wingletR = wingletL.clone();
+            wingletR.position.set(-0.2, 0.15, -2.25);
+            wingletR.rotation.x = -0.15;
+            group.add(wingletR);
+
+            // --- Ekor horizontal (stabilizer) ---
+            const hTailGeo = new THREE.BoxGeometry(0.8, 0.07, 2.2);
+            const hTail = new THREE.Mesh(hTailGeo, wingMat);
+            hTail.position.set(-1.8, 0, 0);
+            group.add(hTail);
+
+            // --- Sirip ekor vertikal ---
+            const vTailGeo = new THREE.BoxGeometry(0.9, 0.8, 0.07);
+            const vTail = new THREE.Mesh(vTailGeo, wingMat);
+            vTail.position.set(-1.6, 0.4, 0);
+            vTail.rotation.z = -0.15;
+            group.add(vTail);
+
+            // --- Mesin kiri ---
+            const engineGeo = new THREE.CylinderGeometry(0.18, 0.15, 0.9, 10);
+            const engineL = new THREE.Mesh(engineGeo, engineMat);
+            engineL.rotation.z = Math.PI / 2;
+            engineL.position.set(0, -0.28, 1.3);
+            group.add(engineL);
+
+            // Intake mesin kiri
+            const intakeGeo = new THREE.TorusGeometry(0.18, 0.03, 8, 16);
+            const intakeL = new THREE.Mesh(intakeGeo, engineMat);
+            intakeL.rotation.y = Math.PI / 2;
+            intakeL.position.set(0.46, -0.28, 1.3);
+            group.add(intakeL);
+
+            // --- Mesin kanan ---
+            const engineR = engineL.clone();
+            engineR.position.set(0, -0.28, -1.3);
+            group.add(engineR);
+
+            const intakeR = intakeL.clone();
+            intakeR.position.set(0.46, -0.28, -1.3);
+            group.add(intakeR);
+
+            // Posisi pesawat: sedikit acak di atas scene, menghadap sumbu X
+            group.position.set(
+                (Math.random() - 0.5) * 4,
+                2.5 + Math.random() * 2,
+                (Math.random() - 0.5) * 4
+            );
+            group.rotation.y = (Math.random() - 0.5) * Math.PI;
+
+            // Aktifkan shadow untuk semua bagian
+            group.traverse(child => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            scene.add(group);
+            objects.push(group);
         }
 
         // 6. Responsive Window
