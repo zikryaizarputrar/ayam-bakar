@@ -3,810 +3,308 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fighter Jet 3D Model Viewer</title>
+    <title>F-22 Raptor · 3D Viewer</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1a1a1a;
-            color: #fff;
-        }
-        #canvas-container {
-            width: 100vw;
-            height: 100vh;
-            display: block;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #0a0a0a; }
+        #canvas-container { width: 100vw; height: 100vh; display: block; }
 
+        /* Top bar */
+        #topbar {
+            position: absolute; top: 0; left: 0; right: 0;
+            padding: 12px 24px;
+            background: linear-gradient(to bottom, rgba(0,0,0,0.7), transparent);
+            display: flex; justify-content: space-between; align-items: center;
+            pointer-events: none;
+        }
+        #topbar h1 { color: #fff; font-size: 1.2rem; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+        #topbar .badge { background: #ff4400; color: #fff; font-size: 0.65rem; font-weight: 700; padding: 3px 8px; border-radius: 3px; letter-spacing: 1px; }
+
+        /* Spec panel bottom-left */
+        #spec-panel {
+            position: absolute; bottom: 24px; left: 24px;
+            background: rgba(0,0,0,0.65);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 10px; padding: 16px 20px;
+            backdrop-filter: blur(10px);
+            color: #fff; min-width: 220px;
+            transition: transform 0.3s ease;
+        }
+        #spec-panel h3 { font-size: 0.7rem; color: #aaa; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 12px; }
+        .spec-row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 0.82rem; }
+        .spec-label { color: #888; }
+        .spec-value { color: #4fc3f7; font-weight: 600; }
+
+        /* Controls hint bottom-right */
+        #controls-hint {
+            position: absolute; bottom: 24px; right: 24px;
+            background: rgba(0,0,0,0.55);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px; padding: 14px 18px;
+            backdrop-filter: blur(8px);
+            color: #aaa; font-size: 0.78rem; line-height: 1.8;
+        }
+        #controls-hint strong { color: #fff; display: block; margin-bottom: 4px; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 1px; }
+
+        /* Status bar top-center */
+        #status-bar {
+            position: absolute; top: 60px; left: 50%; transform: translateX(-50%);
+            background: rgba(0,0,0,0.55); border: 1px solid rgba(255,100,0,0.4);
+            border-radius: 20px; padding: 5px 18px;
+            color: #ff8844; font-size: 0.75rem; font-weight: 600; letter-spacing: 1px;
+            pointer-events: none; white-space: nowrap;
+        }
+        .blink { animation: blink 1.2s step-start infinite; }
+        @keyframes blink { 50% { opacity: 0.3; } }
+
+        /* Crosshair / compass */
+        #compass {
+            position: absolute; top: 50%; right: 24px; transform: translateY(-50%);
+            width: 64px; height: 64px; pointer-events: none;
+        }
+        #compass svg { width: 100%; height: 100%; }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            #spec-panel { bottom: 12px; left: 12px; padding: 12px 14px; min-width: 160px; }
+            #controls-hint { display: none; }
+            #topbar h1 { font-size: 0.9rem; }
+        }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 </head>
 <body>
 
-    <div id="canvas-container"></div>
-
-    <script>
-        // 1. Setup Scene, Kamera, dan Renderer
-        const container = document.getElementById('canvas-container');
-        const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87ceeb);  // Sky blue background
-
-        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(8, 2, 6);  // Better angle to view jet
-
-        const renderer = new THREE.WebGLRenderer({ antialias: true });
-        renderer.setSize(window.innerWidth, window.innerHeight);
-        renderer.shadowMap.enabled = true;
-        container.appendChild(renderer.domElement);
-
-        // 2. Kontrol Kamera (OrbitControls)
-        const controls = new THREE.OrbitControls(camera, renderer.domElement);
-        controls.enableDamping = true;
-        controls.dampingFactor = 0.05;
-        controls.maxPolarAngle = Math.PI;  // Allow full rotation
-
-        // 3. Pencahayaan (Lighting) — Enhanced for jet visibility
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        scene.add(ambientLight);
-
-        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0);
-        dirLight.position.set(10, 20, 10);
-        dirLight.castShadow = true;
-        scene.add(dirLight);
-
-        const backLight = new THREE.DirectionalLight(0xffffff, 0.4);
-        backLight.position.set(-10, 10, -10);
-        scene.add(backLight);
-
-        // ============================================================
-        // Model Jet Tempur Detail — Highly Realistic Fighter (F-22/F-35 style)
-        // ============================================================
-        function createJet() {
-            const group = new THREE.Group();
-
-            // ── MATERIALS ─────────────────────────────────────────────
-            const bodyMat      = new THREE.MeshStandardMaterial({ color: 0x7a8a9a, roughness: 0.3,  metalness: 0.6  });
-            const wingMat      = new THREE.MeshStandardMaterial({ color: 0x6e7e8e, roughness: 0.3,  metalness: 0.6  });
-            const darkMat      = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.4,  metalness: 0.5  });
-            const intakeMat    = new THREE.MeshStandardMaterial({ color: 0x111118, roughness: 0.6,  metalness: 0.4  });
-            const nozzleMat    = new THREE.MeshStandardMaterial({ color: 0x1a2233, roughness: 0.25, metalness: 0.92 });
-            const glassMat     = new THREE.MeshStandardMaterial({ color: 0x44aaee, roughness: 0.0,  metalness: 0.1  });
-            const hudMat       = new THREE.MeshStandardMaterial({ color: 0x44ffaa, roughness: 0.0,  metalness: 0.0  });
-            const seatMat      = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.6,  metalness: 0.3  });
-            const tireMat      = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.95, metalness: 0.0  });
-            const gearMat      = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.25, metalness: 0.9  });
-            const missileMat   = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.4,  metalness: 0.6  });
-            const missileTip   = new THREE.MeshStandardMaterial({ color: 0xcc3300, roughness: 0.3,  metalness: 0.2  });
-            const afterburnMat = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.2,  metalness: 0.1,  emissive: 0xff3300, emissiveIntensity: 1.1 });
-            const innerGlowMat = new THREE.MeshStandardMaterial({ color: 0xffee00, roughness: 0.1,  metalness: 0.0,  emissive: 0xffaa00, emissiveIntensity: 1.5 });
-            const hazeRingMat  = new THREE.MeshStandardMaterial({ color: 0xffd080, roughness: 0.05, metalness: 0.0  });
-            const accentMat    = new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.4,  metalness: 0.3  });
-            const whiteMat     = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5,  metalness: 0.0  });
-            const blueMat      = new THREE.MeshStandardMaterial({ color: 0x0033aa, roughness: 0.5,  metalness: 0.0  });
-            const panelMat     = new THREE.MeshStandardMaterial({ color: 0x6a7a89, roughness: 0.35, metalness: 0.55 });
-            const formMat      = new THREE.MeshStandardMaterial({ color: 0x88ff88, roughness: 0.2,  metalness: 0.0,  emissive: 0x44ff44, emissiveIntensity: 0.6 });
-            const redLightMat  = new THREE.MeshStandardMaterial({ color: 0xff2200, emissive: 0xff0000, emissiveIntensity: 1.2 });
-            const greenLightMat= new THREE.MeshStandardMaterial({ color: 0x00ff44, emissive: 0x00ff22, emissiveIntensity: 1.2 });
-            const whiteLightMat= new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xffffff, emissiveIntensity: 1.5 });
-            const strobeMat    = new THREE.MeshStandardMaterial({ color: 0xffeeaa, emissive: 0xffcc44, emissiveIntensity: 2.0 });
-            const stencilMat   = new THREE.MeshStandardMaterial({ color: 0x9aabb8, roughness: 0.5,  metalness: 0.3  });
-            const serialMat    = new THREE.MeshStandardMaterial({ color: 0x8898a8, roughness: 0.4,  metalness: 0.4  });
-            const finFlashR    = new THREE.MeshStandardMaterial({ color: 0xdd2222, roughness: 0.4,  metalness: 0.2  });
-            const finFlashW    = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.4,  metalness: 0.1  });
-            const finFlashB    = new THREE.MeshStandardMaterial({ color: 0x1133bb, roughness: 0.4,  metalness: 0.2  });
-            const pylonMat     = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.4,  metalness: 0.55 });
-
-            // Helper: enable shadows on a mesh
-            function sh(mesh) { mesh.castShadow = true; mesh.receiveShadow = true; return mesh; }
-
-            // ── 1. FUSELAGE — LatheGeometry with 18 profile points ───
-            // Points run from nose tip (x=0) to tail base along the X axis.
-            // The lathe rotates around the Y axis, then we tilt it so X is the
-            // longitudinal axis of the jet.
-            const fusePts = [
-                // ── Nose cone: very sharp radar dome taper (F-22 style ogive) ──
-                new THREE.Vector2(0.000, 0.004), // needle nose tip
-                new THREE.Vector2(0.055, 0.022), // nose point 2
-                new THREE.Vector2(0.130, 0.055), // nose point 3
-                new THREE.Vector2(0.240, 0.098), // nose cone mid
-                new THREE.Vector2(0.400, 0.148), // radar dome shoulder
-                new THREE.Vector2(0.600, 0.188), // radar dome base
-                // ── Smooth expansion to cockpit ──────────────────────
-                new THREE.Vector2(0.900, 0.218), // forward nose barrel
-                new THREE.Vector2(1.300, 0.248), // pre-cockpit widening
-                new THREE.Vector2(1.800, 0.266), // cockpit sill region
-                new THREE.Vector2(2.300, 0.272), // cockpit lateral max
-                // ── Flatter cross-section mid-fuselage (stealth chisel) ─
-                new THREE.Vector2(2.900, 0.274), // post-cockpit plateau
-                new THREE.Vector2(3.500, 0.270), // intake region start
-                new THREE.Vector2(4.000, 0.265), // mid-fuselage flat zone
-                // ── Area-rule waist / Whitcomb narrowing at wing root ──
-                new THREE.Vector2(4.400, 0.258), // waist start
-                new THREE.Vector2(4.700, 0.250), // waist minimum (coke-bottle)
-                new THREE.Vector2(5.000, 0.255), // waist recovery
-                // ── Wider engine bay / intake expansion ──────────────
-                new THREE.Vector2(5.350, 0.268), // aft fuselage expansion
-                new THREE.Vector2(5.700, 0.282), // engine bay widening
-                new THREE.Vector2(6.000, 0.296), // engine bay mid
-                new THREE.Vector2(6.250, 0.308), // max engine girth
-                // ── Smooth boat-tail taper to nozzle exit ────────────
-                new THREE.Vector2(6.480, 0.298), // nozzle convergence start
-                new THREE.Vector2(6.650, 0.272), // nozzle narrowing
-                new THREE.Vector2(6.800, 0.238), // nozzle throat
-                new THREE.Vector2(6.930, 0.196), // nozzle divergent section
-                new THREE.Vector2(7.070, 0.152), // nozzle exit plane
-                new THREE.Vector2(7.200, 0.112), // tail boat-tail terminus
-            ];
-            const fuselage = sh(new THREE.Mesh(
-                new THREE.LatheGeometry(fusePts, 24), bodyMat));
-            fuselage.rotation.z = -Math.PI / 2;
-            fuselage.position.x = -3.6;          // centre the body in the group
-            group.add(fuselage);
-
-            // ── 1b. Nose cone — sharper conical overlay ───────────────
-            const noseCone = sh(new THREE.Mesh(
-                new THREE.ConeGeometry(0.14, 0.65, 18), darkMat));
-            noseCone.rotation.z = -Math.PI / 2;
-            noseCone.position.set(3.73, 0, 0);   // forward of fuselage lathe
-            group.add(noseCone);
-
-            // ── 1c. Chine strips — flat BoxGeometry on lower-side fuselage
-            [-1, 1].forEach(s => {
-                const chine = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(4.2, 0.012, 0.18), darkMat));
-                chine.position.set(0.6, -0.20, s * 0.24);
-                group.add(chine);
-            });
-
-            // ── 1d. Dorsal spine ──────────────────────────────────────
-            const dorsalSpine = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(3.8, 0.06, 0.12), darkMat));
-            dorsalSpine.position.set(-0.4, 0.29, 0);
-            group.add(dorsalSpine);
-
-            // ── 1e. Ventral keel ─────────────────────────────────────
-            const ventralKeel = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(4.0, 0.09, 0.14), darkMat));
-            ventralKeel.position.set(-0.5, -0.31, 0);
-            group.add(ventralKeel);
-
-            // ── 2. COCKPIT ────────────────────────────────────────────
-            // 2a. Canopy base frame (dark, sits flush on fuselage top)
-            const canopyFrame = sh(new THREE.Mesh(
-                new THREE.CylinderGeometry(0.155, 0.195, 0.72, 16), darkMat));
-            canopyFrame.rotation.z = Math.PI / 2;
-            canopyFrame.position.set(2.25, 0.26, 0);
-            group.add(canopyFrame);
-
-            // 2b. Bubble glass (transparent blue hemisphere)
-            const canopyGlass = sh(new THREE.Mesh(
-                new THREE.SphereGeometry(0.205, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.50), glassMat));
-            canopyGlass.rotation.z = -Math.PI / 2;
-            canopyGlass.position.set(2.25, 0.24, 0);
-            group.add(canopyGlass);
-
-            // 2c. Canopy bow frame — thin torus ring around glass
-            const canopyBow = sh(new THREE.Mesh(
-                new THREE.TorusGeometry(0.205, 0.010, 8, 24), darkMat));
-            canopyBow.rotation.y = Math.PI / 2;
-            canopyBow.position.set(2.25, 0.29, 0);
-            group.add(canopyBow);
-
-            // 2d. Front windscreen flat panel
-            const windscreen = sh(new THREE.Mesh(
-                new THREE.PlaneGeometry(0.20, 0.14), glassMat));
-            windscreen.rotation.set(0.55, Math.PI / 2, 0);
-            windscreen.position.set(2.62, 0.32, 0);
-            group.add(windscreen);
-
-            // 2e. Ejection seat — small box + headrest
-            const seatBase = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.11, 0.14, 0.09), seatMat));
-            seatBase.position.set(2.22, 0.15, 0);
-            group.add(seatBase);
-            const headrest = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.07, 0.07, 0.09), darkMat));
-            headrest.position.set(2.20, 0.265, 0);
-            group.add(headrest);
-
-            // 2f. HUD glass panel (green tinted)
-            const hudGlass = sh(new THREE.Mesh(
-                new THREE.PlaneGeometry(0.16, 0.10), hudMat));
-            hudGlass.rotation.set(0.38, Math.PI / 2, 0);
-            hudGlass.position.set(2.58, 0.31, 0);
-            group.add(hudGlass);
-
-            // 2g. VHF blade antenna near cockpit
-            const vhfAnt = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.012, 0.09, 0.035), darkMat));
-            vhfAnt.position.set(2.0, 0.37, 0);
-            group.add(vhfAnt);
-
-            // 2h. Refueling receptacle cover behind cockpit
-            const refuelCover = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.14, 0.022, 0.09), panelMat));
-            refuelCover.position.set(1.55, 0.295, 0);
-            group.add(refuelCover);
-
-            // ── 3. WINGS — delta/swept via ExtrudeGeometry ───────────
-            [-1, 1].forEach(s => {
-                // 3a. Main wing body
-                const ws = new THREE.Shape();
-                ws.moveTo( 0.70,  0.00);
-                ws.lineTo( 1.15,  s * 0.50);
-                ws.lineTo( 0.80,  s * 1.35);
-                ws.lineTo( 0.20,  s * 2.10);
-                ws.lineTo(-0.20,  s * 2.65);
-                ws.lineTo(-1.00,  s * 2.68);
-                ws.lineTo(-0.82,  s * 1.75);
-                ws.lineTo(-0.50,  s * 0.90);
-                ws.lineTo(-0.18,  s * 0.35);
-                ws.lineTo(-0.05,  0.00);
-                ws.closePath();
-                const wing = sh(new THREE.Mesh(
-                    new THREE.ExtrudeGeometry(ws, { depth: 0.038, bevelEnabled: true, bevelThickness: 0.010, bevelSize: 0.008, bevelSegments: 2 }), wingMat));
-                wing.rotation.x = -Math.PI / 2;
-                wing.position.set(-0.20, -0.25, 0);
-                group.add(wing);
-
-                // 3b. Leading edge — thin darker strip along front of wing
-                const les = new THREE.Shape();
-                les.moveTo( 0.70,  0.00);
-                les.lineTo( 1.15,  s * 0.50);
-                les.lineTo( 0.80,  s * 1.35);
-                les.lineTo( 0.20,  s * 2.10);
-                les.lineTo(-0.20,  s * 2.65);
-                les.lineTo(-0.12,  s * 2.65);
-                les.lineTo( 0.26,  s * 2.10);
-                les.lineTo( 0.88,  s * 1.35);
-                les.lineTo( 1.22,  s * 0.50);
-                les.lineTo( 0.80,  0.00);
-                les.closePath();
-                const leadEdge = sh(new THREE.Mesh(
-                    new THREE.ExtrudeGeometry(les, { depth: 0.040, bevelEnabled: false }), darkMat));
-                leadEdge.rotation.x = -Math.PI / 2;
-                leadEdge.position.set(-0.20, -0.252, 0);
-                group.add(leadEdge);
-
-                // 3c. Flaperons/ailerons — darker trailing-edge panels
-                const als = new THREE.Shape();
-                als.moveTo(-0.20,  s * 1.55);
-                als.lineTo(-0.88,  s * 2.62);
-                als.lineTo(-1.00,  s * 2.62);
-                als.lineTo(-0.34,  s * 1.55);
-                als.closePath();
-                const aileron = sh(new THREE.Mesh(
-                    new THREE.ExtrudeGeometry(als, { depth: 0.042, bevelEnabled: false }), darkMat));
-                aileron.rotation.x = -Math.PI / 2;
-                aileron.position.set(-0.20, -0.248, 0);
-                group.add(aileron);
-
-                // 3d. Wing fence — thin vertical tab on upper surface
-                const fence = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(0.18, 0.07, 0.012), darkMat));
-                fence.position.set(-0.30, -0.22, s * 1.40);
-                group.add(fence);
-
-                // 3e. Static discharge wicks on wingtip
-                const wick = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.003, 0.001, 0.08, 5), darkMat));
-                wick.position.set(-0.90, -0.24, s * 2.64);
-                group.add(wick);
-            });
-
-            // ── 4. TAIL ───────────────────────────────────────────────
-            // 4a. Horizontal stabilators — all-moving, tapered
-            [-1, 1].forEach(s => {
-                const hs = new THREE.Shape();
-                hs.moveTo( 0.25, 0.00);
-                hs.lineTo( 0.45, s * 0.35);
-                hs.lineTo( 0.12, s * 1.10);
-                hs.lineTo(-0.55, s * 1.10);
-                hs.lineTo(-0.30, s * 0.35);
-                hs.lineTo(-0.14, 0.00);
-                hs.closePath();
-                const stab = sh(new THREE.Mesh(
-                    new THREE.ExtrudeGeometry(hs, { depth: 0.030, bevelEnabled: false }), wingMat));
-                stab.rotation.x = -Math.PI / 2;
-                stab.position.set(-3.10, -0.03, 0);
-                group.add(stab);
-
-                // Tail nav light
-                const tailNavLight = sh(new THREE.Mesh(
-                    new THREE.SphereGeometry(0.022, 8, 6),
-                    s > 0 ? greenLightMat : redLightMat));
-                tailNavLight.position.set(-3.42, -0.04, s * 1.08);
-                group.add(tailNavLight);
-            });
-
-            // 4b. Twin canted vertical stabilizers
-            [-1, 1].forEach(s => {
-                // Main fin body
-                const vs = new THREE.Shape();
-                vs.moveTo( 0.00, 0.00);
-                vs.lineTo( 0.50, 0.42);
-                vs.lineTo( 0.32, 1.22);
-                vs.lineTo(-0.10, 1.22);
-                vs.lineTo(-0.42, 0.42);
-                vs.closePath();
-                const vtail = sh(new THREE.Mesh(
-                    new THREE.ExtrudeGeometry(vs, { depth: 0.040, bevelEnabled: false }), bodyMat));
-                vtail.rotation.y = Math.PI / 2;
-                vtail.rotation.z = s * 0.18;
-                vtail.position.set(-3.18, 0.20, s * 0.22);
-                group.add(vtail);
-
-                // Rudder panel (slightly lighter)
-                const rs = new THREE.Shape();
-                rs.moveTo(-0.01, 0.30);
-                rs.lineTo( 0.24, 0.45);
-                rs.lineTo( 0.32, 1.22);
-                rs.lineTo(-0.10, 1.22);
-                rs.closePath();
-                const rudder = sh(new THREE.Mesh(
-                    new THREE.ExtrudeGeometry(rs, { depth: 0.043, bevelEnabled: false }), panelMat));
-                rudder.rotation.y = Math.PI / 2;
-                rudder.rotation.z = s * 0.18;
-                rudder.position.set(-3.175, 0.20, s * 0.22);
-                group.add(rudder);
-
-                // RWR antenna bump at fin tip
-                const rwr = sh(new THREE.Mesh(
-                    new THREE.SphereGeometry(0.032, 8, 6), darkMat));
-                rwr.position.set(-3.14, 1.44, s * 0.18);
-                group.add(rwr);
-
-                // Fin flash — three stripes on each vertical tail
-                const flashW = sh(new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.38, 0.12), finFlashW));
-                flashW.rotation.y = Math.PI / 2;
-                flashW.rotation.z = s * 0.18;
-                flashW.position.set(-3.14, 0.70, s * 0.22);
-                group.add(flashW);
-                const flashR = sh(new THREE.Mesh(new THREE.BoxGeometry(0.013, 0.38, 0.055), finFlashR));
-                flashR.rotation.y = Math.PI / 2;
-                flashR.rotation.z = s * 0.18;
-                flashR.position.set(-3.14, 0.70, s * (0.22 + 0.055));
-                group.add(flashR);
-                const flashB = sh(new THREE.Mesh(new THREE.BoxGeometry(0.013, 0.38, 0.055), finFlashB));
-                flashB.rotation.y = Math.PI / 2;
-                flashB.rotation.z = s * 0.18;
-                flashB.position.set(-3.14, 0.70, s * (0.22 - 0.055));
-                group.add(flashB);
-
-                // Static discharge wicks on tail tips
-                const tailWick = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.003, 0.001, 0.07, 5), darkMat));
-                tailWick.position.set(-3.14, 1.56, s * 0.18);
-                group.add(tailWick);
-            });
-
-            // 4c. White tail position light
-            const tailLight = sh(new THREE.Mesh(
-                new THREE.SphereGeometry(0.025, 8, 6), whiteLightMat));
-            tailLight.position.set(-3.62, 0.08, 0);
-            group.add(tailLight);
-
-            // ── 5. ENGINE & EXHAUST ───────────────────────────────────
-            // 5a. Engine intake duct (from chin to rear)
-            const intakeDuct = sh(new THREE.Mesh(
-                new THREE.CylinderGeometry(0.24, 0.28, 4.20, 18), intakeMat));
-            intakeDuct.rotation.z = Math.PI / 2;
-            intakeDuct.position.set(-1.60, -0.04, 0);
-            group.add(intakeDuct);
-
-            // 5b. Chin intake lip
-            const intakeShape = new THREE.Shape();
-            intakeShape.moveTo( 0.60,  0.00);
-            intakeShape.lineTo( 0.60,  0.44);
-            intakeShape.lineTo(-0.30,  0.52);
-            intakeShape.lineTo(-0.40,  0.00);
-            intakeShape.closePath();
-            const intakeMesh = sh(new THREE.Mesh(
-                new THREE.ExtrudeGeometry(intakeShape, { depth: 0.38, bevelEnabled: true, bevelThickness: 0.018, bevelSize: 0.016, bevelSegments: 3 }), intakeMat));
-            intakeMesh.rotation.x = Math.PI / 2;
-            intakeMesh.position.set(1.62, -0.24, -0.19);
-            group.add(intakeMesh);
-
-            // Intake lip torus
-            const intakeLip = sh(new THREE.Mesh(
-                new THREE.TorusGeometry(0.20, 0.022, 10, 22, Math.PI), bodyMat));
-            intakeLip.rotation.z = Math.PI / 2;
-            intakeLip.position.set(2.35, -0.27, 0);
-            group.add(intakeLip);
-
-            // DSI bump (bleed air boundary layer splitter)
-            const splitter = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.90, 0.009, 0.36), darkMat));
-            splitter.position.set(1.90, -0.17, 0);
-            group.add(splitter);
-
-            // 5c. Convergent-divergent nozzle — 12 petals alternating light/dark
-            const nozzleDark  = nozzleMat;
-            const nozzleLight = new THREE.MeshStandardMaterial({ color: 0x2a3a4a, roughness: 0.22, metalness: 0.95 });
-            for (let i = 0; i < 12; i++) {
-                const angle = (i / 12) * Math.PI * 2;
-                const petalMat = i % 2 === 0 ? nozzleDark : nozzleLight;
-                const petal = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(0.32, 0.044, 0.105), petalMat));
-                petal.position.set(-3.38, Math.sin(angle) * 0.245, Math.cos(angle) * 0.245);
-                petal.rotation.x = angle;
-                group.add(petal);
-            }
-
-            // 5d. Afterburner cone (emissive orange)
-            const abCone = sh(new THREE.Mesh(
-                new THREE.ConeGeometry(0.22, 0.88, 16), afterburnMat));
-            abCone.rotation.z = -Math.PI / 2;
-            abCone.position.set(-3.92, 0, 0);
-            group.add(abCone);
-
-            // 5e. Inner flame core (yellow, more transparent)
-            const abInner = sh(new THREE.Mesh(
-                new THREE.ConeGeometry(0.11, 0.60, 14), innerGlowMat));
-            abInner.rotation.z = -Math.PI / 2;
-            abInner.position.set(-3.88, 0, 0);
-            group.add(abInner);
-
-            // 5f. Heat haze ring at nozzle exit
-            const hazeRing = sh(new THREE.Mesh(
-                new THREE.TorusGeometry(0.22, 0.025, 8, 24), hazeRingMat));
-            hazeRing.rotation.y = Math.PI / 2;
-            hazeRing.position.set(-3.54, 0, 0);
-            group.add(hazeRing);
-
-            // ── 6. WEAPONS ────────────────────────────────────────────
-
-            // Helper: build an AIM-9 Sidewinder (body + seeker + 4 front fins + 4 tail fins)
-            function makeAIM9(px, py, pz) {
-                const mg = new THREE.Group();
-                // Body
-                mg.add(sh(new THREE.Mesh(new THREE.CylinderGeometry(0.040, 0.040, 1.10, 12), missileMat)));
-                // Seeker dome
-                const dome = sh(new THREE.Mesh(new THREE.SphereGeometry(0.040, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.55), missileTip));
-                dome.rotation.z = -Math.PI / 2;
-                dome.position.x = 0.67;
-                mg.add(dome);
-                // Seeker ring
-                const skRing = sh(new THREE.Mesh(new THREE.TorusGeometry(0.040, 0.007, 6, 14), darkMat));
-                skRing.rotation.y = Math.PI / 2;
-                skRing.position.x = 0.48;
-                mg.add(skRing);
-                // 4 canard fins near nose
-                for (let f = 0; f < 4; f++) {
-                    const fa = (f / 4) * Math.PI * 2 + Math.PI / 4;
-                    const fin = sh(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.004, 0.075), missileMat));
-                    fin.position.set(0.30, Math.sin(fa) * 0.062, Math.cos(fa) * 0.062);
-                    fin.rotation.x = fa;
-                    mg.add(fin);
-                }
-                // 4 tail fins
-                for (let f = 0; f < 4; f++) {
-                    const fa = (f / 4) * Math.PI * 2 + Math.PI / 4;
-                    const fin = sh(new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.004, 0.10), missileMat));
-                    fin.position.set(-0.42, Math.sin(fa) * 0.062, Math.cos(fa) * 0.062);
-                    fin.rotation.x = fa;
-                    mg.add(fin);
-                }
-                mg.rotation.z = Math.PI / 2;
-                mg.position.set(px, py, pz);
-                return mg;
-            }
-
-            // 6a. AIM-9 Sidewinders at each wingtip
-            group.add(makeAIM9(-0.30, -0.27, -2.72));
-            group.add(makeAIM9(-0.30, -0.27,  2.72));
-
-            // Helper: build an AMRAAM-style missile + pylon
-            function makeAMRAAM(px, py, pz) {
-                const mg = new THREE.Group();
-                // Pylon hardpoint
-                mg.add(sh(new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.10, 0.10), pylonMat)));
-                // Missile body
-                const body = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 1.30, 12), missileMat));
-                body.rotation.z = Math.PI / 2;
-                body.position.y = -0.16;
-                mg.add(body);
-                // Guidance dome tip
-                const tip = sh(new THREE.Mesh(new THREE.ConeGeometry(0.038, 0.20, 12), missileTip));
-                tip.rotation.z = -Math.PI / 2;
-                tip.position.set(0.75, -0.16, 0);
-                mg.add(tip);
-                // 4 mid fins
-                for (let f = 0; f < 4; f++) {
-                    const fa = (f / 4) * Math.PI * 2 + Math.PI / 4;
-                    const fin = sh(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.004, 0.09), missileMat));
-                    fin.position.set(0.22, -0.16 + Math.sin(fa) * 0.058, Math.cos(fa) * 0.058);
-                    fin.rotation.x = fa;
-                    mg.add(fin);
-                }
-                // 4 tail fins
-                for (let f = 0; f < 4; f++) {
-                    const fa = (f / 4) * Math.PI * 2 + Math.PI / 4;
-                    const fin = sh(new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.004, 0.09), missileMat));
-                    fin.position.set(-0.50, -0.16 + Math.sin(fa) * 0.058, Math.cos(fa) * 0.058);
-                    fin.rotation.x = fa;
-                    mg.add(fin);
-                }
-                mg.position.set(px, py, pz);
-                return mg;
-            }
-
-            // 6b. AMRAAM missiles on underbelly pylons
-            group.add(makeAMRAAM( 0.40, -0.44, -0.72));
-            group.add(makeAMRAAM( 0.40, -0.44,  0.72));
-
-            // 6c. Centerline fuel tank
-            (function() {
-                const tg = new THREE.Group();
-                // Main cylinder
-                tg.add(sh(new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 2.20, 14), darkMat)));
-                // Front endcap (hemisphere)
-                const frontCap = sh(new THREE.Mesh(
-                    new THREE.SphereGeometry(0.075, 10, 7, 0, Math.PI * 2, 0, Math.PI / 2), darkMat));
-                frontCap.rotation.z = -Math.PI / 2;
-                frontCap.position.x = 1.10;
-                tg.add(frontCap);
-                // Rear endcap
-                const rearCap = sh(new THREE.Mesh(
-                    new THREE.SphereGeometry(0.075, 10, 7, 0, Math.PI * 2, 0, Math.PI / 2), darkMat));
-                rearCap.rotation.z = Math.PI / 2;
-                rearCap.position.x = -1.10;
-                tg.add(rearCap);
-                // 2 stabilising fins
-                [-1, 1].forEach(s => {
-                    const f = sh(new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.005, 0.11), darkMat));
-                    f.position.set(-0.70, 0, s * 0.085);
-                    tg.add(f);
-                });
-                // Pylon connecting to belly
-                const pyl = sh(new THREE.Mesh(new THREE.BoxGeometry(0.20, 0.18, 0.10), pylonMat));
-                pyl.position.y = 0.15;
-                tg.add(pyl);
-                tg.rotation.z = Math.PI / 2;
-                tg.position.set(0.30, -0.52, 0);
-                group.add(tg);
-            })();
-
-            // ── 7. LANDING GEAR ───────────────────────────────────────
-
-            // Nose gear: strut + scissor link + single tire + mudguard
-            (function() {
-                const ng = new THREE.Group();
-                // Main strut
-                const strut = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.020, 0.020, 0.36, 8), gearMat));
-                strut.position.y = 0;
-                ng.add(strut);
-                // Scissor link
-                const sciss = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(0.012, 0.22, 0.010), gearMat));
-                sciss.rotation.z = 0.20;
-                sciss.position.set(0.04, -0.05, 0.022);
-                ng.add(sciss);
-                // Axle tube
-                const axle = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.011, 0.011, 0.14, 6), gearMat));
-                axle.rotation.z = Math.PI / 2;
-                axle.position.y = -0.20;
-                ng.add(axle);
-                // Single tire
-                const tire = sh(new THREE.Mesh(
-                    new THREE.TorusGeometry(0.065, 0.028, 10, 18), tireMat));
-                tire.rotation.x = Math.PI / 2;
-                tire.position.y = -0.20;
-                ng.add(tire);
-                // Mudguard (half-cylinder above tire)
-                const mud = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.075, 0.075, 0.08, 10, 1, true, 0, Math.PI), darkMat));
-                mud.position.y = -0.13;
-                ng.add(mud);
-                ng.position.set(2.50, -0.48, 0.00);
-                group.add(ng);
-            })();
-
-            // Main landing gear (both sides): angled strut + dual tires + gear door
-            [-1, 1].forEach(s => {
-                const mg = new THREE.Group();
-                // Angled main strut
-                const strut = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.024, 0.024, 0.40, 8), gearMat));
-                strut.rotation.z = s * 0.18;
-                ng_offset = s * 0.04;
-                mg.add(strut);
-                // Axle tube (wider for dual tires)
-                const axle = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.013, 0.013, 0.22, 6), gearMat));
-                axle.rotation.z = Math.PI / 2;
-                axle.position.set(ng_offset, -0.22, 0);
-                mg.add(axle);
-                // Dual tires side by side
-                [-0.07, 0.07].forEach(zo => {
-                    const tire = sh(new THREE.Mesh(
-                        new THREE.TorusGeometry(0.082, 0.034, 10, 20), tireMat));
-                    tire.rotation.x = Math.PI / 2;
-                    tire.position.set(ng_offset, -0.22, zo);
-                    mg.add(tire);
-                });
-                // Gear door (thin panel)
-                const door = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(0.30, 0.008, 0.22), darkMat));
-                door.position.set(ng_offset, -0.08, 0);
-                door.rotation.z = s * 0.25;
-                mg.add(door);
-                mg.position.set(-0.40, -0.50, s * 0.50);
-                group.add(mg);
-            });
-
-            // ── 8. SURFACE DETAILS & ANTENNAS ─────────────────────────
-
-            // 8a. Panel lines — 8 thin BoxGeometry strips on fuselage
-            const panelLineData = [
-                // [x, y, z, rx, ry, rz, w, h, d]
-                [ 1.80,  0.288,  0.00, 0, 0, 0,  0.55, 0.010, 0.30],  // top forward
-                [ 0.40,  0.288,  0.00, 0, 0, 0,  0.50, 0.010, 0.28],  // top mid
-                [-1.00,  0.288,  0.00, 0, 0, 0,  0.60, 0.010, 0.32],  // top aft
-                [-2.20,  0.285,  0.00, 0, 0, 0,  0.50, 0.010, 0.26],  // top rear
-                [ 1.20, -0.005,  0.285, 0, 0, 0, 0.65, 0.010, 0.016], // right side
-                [ 1.20, -0.005, -0.285, 0, 0, 0, 0.65, 0.010, 0.016], // left side
-                [ 0.20, -0.28,   0.00, 0, 0, 0,  0.45, 0.010, 0.18],  // belly forward
-                [-1.60, -0.29,   0.00, 0, 0, 0,  0.55, 0.010, 0.22],  // belly aft
-            ];
-            panelLineData.forEach(d => {
-                const pl = sh(new THREE.Mesh(new THREE.BoxGeometry(d[6], d[7], d[8]), panelMat));
-                pl.position.set(d[0], d[1], d[2]);
-                group.add(pl);
-            });
-
-            // 8b. Access panels — 5 rectangles on fuselage
-            const accessPanels = [
-                [ 1.60,  0.290,  0.00, 0.30, 0.018, 0.20],
-                [-0.60,  0.290,  0.00, 0.28, 0.018, 0.18],
-                [ 0.90, -0.290,  0.00, 0.25, 0.018, 0.16],
-                [-1.80,  0.000,  0.286, 0.22, 0.018, 0.012],
-                [-1.80,  0.000, -0.286, 0.22, 0.018, 0.012],
-            ];
-            accessPanels.forEach(d => {
-                const ap = sh(new THREE.Mesh(new THREE.BoxGeometry(d[3], d[4], d[5]), stencilMat));
-                ap.position.set(d[0], d[1], d[2]);
-                group.add(ap);
-            });
-
-            // 8c. Pitot tube — angled slightly upward on nose
-            const pitotTube = sh(new THREE.Mesh(
-                new THREE.CylinderGeometry(0.010, 0.022, 0.65, 8), darkMat));
-            pitotTube.rotation.z = Math.PI / 2 - 0.12;  // slight upward angle
-            pitotTube.position.set(3.82, 0.04, 0);
-            group.add(pitotTube);
-
-            // 8d. AOA vanes on both sides of nose
-            [-1, 1].forEach(s => {
-                const aoa = sh(new THREE.Mesh(
-                    new THREE.CylinderGeometry(0.006, 0.010, 0.26, 6), darkMat));
-                aoa.rotation.set(0, 0, Math.PI / 2 - 0.20);
-                aoa.position.set(3.10, -0.16, s * 0.14);
-                group.add(aoa);
-            });
-
-            // 8e. IFF antenna — small blade on fuselage top
-            const iffAnt = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.22, 0.08, 0.011), darkMat));
-            iffAnt.position.set(0.60, 0.370, 0);
-            group.add(iffAnt);
-
-            // 8f. Position lights — red (left), green (right) on wingtips
-            const leftWingLight = sh(new THREE.Mesh(
-                new THREE.SphereGeometry(0.030, 8, 6), redLightMat));
-            leftWingLight.position.set(-0.95, -0.24, -2.70);
-            group.add(leftWingLight);
-
-            const rightWingLight = sh(new THREE.Mesh(
-                new THREE.SphereGeometry(0.030, 8, 6), greenLightMat));
-            rightWingLight.position.set(-0.95, -0.24,  2.70);
-            group.add(rightWingLight);
-
-            // 8g. Anti-collision strobe on belly
-            const strobe = sh(new THREE.Mesh(
-                new THREE.SphereGeometry(0.035, 8, 6), strobeMat));
-            strobe.position.set(0.80, -0.32, 0);
-            group.add(strobe);
-
-            // 8h. Formation lighting strips (emissive thin strips on fuselage sides)
-            [-1, 1].forEach(s => {
-                const fls = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(1.80, 0.012, 0.018), formMat));
-                fls.position.set(0.20, 0.08, s * 0.285);
-                group.add(fls);
-                const fls2 = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(1.20, 0.012, 0.018), formMat));
-                fls2.position.set(-1.60, 0.05, s * 0.288);
-                group.add(fls2);
-            });
-
-            // ── 9. MARKINGS & LIVERY ──────────────────────────────────
-
-            // 9a. 3-layer roundel on both fuselage sides
-            [1, -1].forEach(s => {
-                // Outer red ring
-                const r1 = sh(new THREE.Mesh(new THREE.CircleGeometry(0.130, 20), accentMat));
-                r1.rotation.y = s * Math.PI / 2;
-                r1.position.set(1.05, 0.02, s * 0.287);
-                group.add(r1);
-                // Middle white ring
-                const r2 = sh(new THREE.Mesh(new THREE.CircleGeometry(0.082, 20), whiteMat));
-                r2.rotation.y = s * Math.PI / 2;
-                r2.position.set(1.05, 0.02, s * 0.2875);
-                group.add(r2);
-                // Inner blue circle
-                const r3 = sh(new THREE.Mesh(new THREE.CircleGeometry(0.042, 20), blueMat));
-                r3.rotation.y = s * Math.PI / 2;
-                r3.position.set(1.05, 0.02, s * 0.288);
-                group.add(r3);
-            });
-
-            // 9b. Serial number area on tail boom
-            const serialRect = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.55, 0.016, 0.10), serialMat));
-            serialRect.position.set(-2.60, 0.12, 0.292);
-            group.add(serialRect);
-            const serialRect2 = sh(new THREE.Mesh(
-                new THREE.BoxGeometry(0.55, 0.016, 0.10), serialMat));
-            serialRect2.position.set(-2.60, 0.12, -0.292);
-            group.add(serialRect2);
-
-            // 9c. Stencil marks — small light-gray strips suggesting maintenance text
-            const stencilPositions = [
-                [ 2.10, -0.27,  0.12],
-                [ 2.10, -0.27, -0.12],
-                [ 1.30,  0.295, 0.10],
-                [ 0.20,  0.295, 0.08],
-                [-0.80, -0.295, 0.08],
-                [-1.50,  0.295, 0.06],
-                [-2.10, -0.295, 0.10],
-                [ 3.20,  0.00,  0.15],
-            ];
-            stencilPositions.forEach(p => {
-                const sm = sh(new THREE.Mesh(
-                    new THREE.BoxGeometry(0.14, 0.008, 0.040), stencilMat));
-                sm.position.set(p[0], p[1], p[2]);
-                group.add(sm);
-            });
-
-            // ── 10. POSITION & ADD TO SCENE ───────────────────────────
-            group.position.set(0, 0, 0);
-            group.rotation.y = 0;
-
-            group.traverse(c => {
-                if (c.isMesh) {
-                    c.castShadow   = true;
-                    c.receiveShadow = true;
-                }
-            });
-
-            scene.add(group);
-            return group;
+<div id="canvas-container"></div>
+
+<div id="topbar">
+    <h1>&#9889; F-22 Raptor &middot; 3D Viewer</h1>
+    <div class="badge">CLASSIFIED</div>
+</div>
+
+<div id="status-bar">
+    <span class="blink">&#9679;</span> ENGINES ACTIVE &middot; AFTERBURNER ON &middot; TAXI MODE
+</div>
+
+<div id="spec-panel">
+    <h3>Aircraft Specifications</h3>
+    <div class="spec-row"><span class="spec-label">Type</span><span class="spec-value">F-22 Raptor</span></div>
+    <div class="spec-row"><span class="spec-label">Role</span><span class="spec-value">Air Superiority</span></div>
+    <div class="spec-row"><span class="spec-label">Speed</span><span class="spec-value">Mach 2.25</span></div>
+    <div class="spec-row"><span class="spec-label">Range</span><span class="spec-value">2,960 km</span></div>
+    <div class="spec-row"><span class="spec-label">Ceiling</span><span class="spec-value">19,812 m</span></div>
+    <div class="spec-row"><span class="spec-label">Thrust</span><span class="spec-value">2&times; 156 kN</span></div>
+    <div class="spec-row"><span class="spec-label">Weapons</span><span class="spec-value">AIM-9 / AMRAAM</span></div>
+</div>
+
+<div id="controls-hint">
+    <strong>Camera Controls</strong>
+    &#128433; Drag Left &middot; Rotate<br>
+    &#128433; Drag Right &middot; Pan<br>
+    &#128433; Scroll &middot; Zoom<br>
+    &#128241; Pinch &middot; Zoom
+</div>
+
+<script>
+    // ── SCENE SETUP ───────────────────────────────────────────────
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    scene.background = new THREE.Color(0x87ceeb);
+    scene.fog = new THREE.FogExp2(0xc8dff5, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 500);
+    camera.position.set(6, 2.5, 5);
+    camera.lookAt(0, 0.5, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+    container.appendChild(renderer.domElement);
+
+    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2;
+    controls.minDistance = 2;
+    controls.maxDistance = 30;
+    controls.target.set(0, 0.5, 0);
+
+    // ── LIGHTING ──────────────────────────────────────────────────
+    scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+
+    const sun = new THREE.DirectionalLight(0xfff4e0, 1.4);
+    sun.position.set(15, 25, 10);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 80;
+    sun.shadow.camera.left = -20;
+    sun.shadow.camera.right = 20;
+    sun.shadow.camera.top = 20;
+    sun.shadow.camera.bottom = -20;
+    sun.shadow.bias = -0.001;
+    scene.add(sun);
+
+    const rimLight = new THREE.DirectionalLight(0x8ab4cc, 0.5);
+    rimLight.position.set(-10, 8, -5);
+    scene.add(rimLight);
+
+    const bounceLight = new THREE.HemisphereLight(0x87ceeb, 0x334422, 0.4);
+    scene.add(bounceLight);
+
+    // ── AIRPORT SCENE ─────────────────────────────────────────────
+    function buildAirport() {
+        // ── TARMAC / RUNWAY ─────────────────────────────────────────
+        const tarmacMat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.95, metalness: 0.0 });
+        const tarmac = new THREE.Mesh(new THREE.PlaneGeometry(60, 20), tarmacMat);
+        tarmac.rotation.x = -Math.PI / 2;
+        tarmac.receiveShadow = true;
+        scene.add(tarmac);
+
+        // Runway centerline markings (white dashed lines)
+        const lineMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8 });
+        for (let i = -5; i <= 5; i++) {
+            const line = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 0.12), lineMat);
+            line.rotation.x = -Math.PI / 2;
+            line.position.set(i * 4, 0.001, 0);
+            scene.add(line);
         }
 
-        // Create jet automatically on load and keep reference for rotation
-        const jet = createJet();
+        // Yellow taxi line
+        const taxiMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.8 });
+        const taxiLine = new THREE.Mesh(new THREE.PlaneGeometry(60, 0.08), taxiMat);
+        taxiLine.rotation.x = -Math.PI / 2;
+        taxiLine.position.set(0, 0.002, 1.5);
+        scene.add(taxiLine);
 
-        // 6. Responsive Window
-        window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+        // ── GRASS AREAS beside runway ────────────────────────────────
+        const grassMat = new THREE.MeshStandardMaterial({ color: 0x3a5e2a, roughness: 0.9 });
+        [-1, 1].forEach(s => {
+            const grass = new THREE.Mesh(new THREE.PlaneGeometry(60, 18), grassMat);
+            grass.rotation.x = -Math.PI / 2;
+            grass.position.set(0, -0.005, s * 19);
+            grass.receiveShadow = true;
+            scene.add(grass);
         });
 
-        // 7. Animation Loop
-        function animate() {
-            requestAnimationFrame(animate);
-            controls.update();
-            // Auto-rotate jet slowly around Y axis
-            jet.rotation.y += 0.005;
-            renderer.render(scene, camera);
+        // ── RUNWAY EDGE LIGHTS ───────────────────────────────────────
+        const lightPostMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.5, metalness: 0.8 });
+        const lightGlowMat = new THREE.MeshStandardMaterial({ color: 0xffeeaa, emissive: 0xffcc44, emissiveIntensity: 2.0 });
+        for (let i = -5; i <= 5; i++) {
+            [-1, 1].forEach(s => {
+                // Post
+                const post = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.4, 6), lightPostMat);
+                post.position.set(i * 5, 0.2, s * 9.5);
+                post.castShadow = true;
+                scene.add(post);
+                // Light bulb
+                const bulb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), lightGlowMat);
+                bulb.position.set(i * 5, 0.42, s * 9.5);
+                scene.add(bulb);
+            });
         }
-        animate();
-    </script>
-</body>
-</html>
+
+        // ── CONTROL TOWER ────────────────────────────────────────────
+        const concreteMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a6, roughness: 0.8 });
+        const glassBuildMat = new THREE.MeshStandardMaterial({ color: 0x4499cc, roughness: 0.1, metalness: 0.2 });
+
+        // Tower base building
+        const towerBase = new THREE.Mesh(new THREE.BoxGeometry(3, 4, 3), concreteMat);
+        towerBase.position.set(-22, 2, -12);
+        towerBase.castShadow = true;
+        towerBase.receiveShadow = true;
+        scene.add(towerBase);
+
+        // Tower shaft
+        const towerShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, 8, 12), concreteMat);
+        towerShaft.position.set(-22, 8, -12);
+        towerShaft.castShadow = true;
+        scene.add(towerShaft);
+
+        // Tower cab (glass octagon)
+        const towerCab = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.1, 1.8, 8), glassBuildMat);
+        towerCab.position.set(-22, 13, -12);
+        towerCab.castShadow = true;
+        scene.add(towerCab);
+
+        // Tower roof
+        const towerRoof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 1.0, 8), concreteMat);
+        towerRoof.position.set(-22, 14.5, -12);
+        scene.add(towerRoof);
+
+        // ── HANGAR ───────────────────────────────────────────────────
+        const hangarWallMat = new THREE.MeshStandardMaterial({ color: 0x7a8088, roughness: 0.7 });
+        const hangarRoofMat = new THREE.MeshStandardMaterial({ color: 0x5a6068, roughness: 0.6, metalness: 0.2 });
+
+        // Hangar box
+        const hangar = new THREE.Mesh(new THREE.BoxGeometry(12, 5, 8), hangarWallMat);
+        hangar.position.set(20, 2.5, -10);
+        hangar.castShadow = true;
+        hangar.receiveShadow = true;
+        scene.add(hangar);
+
+        // Hangar roof (arch shape using cylinder)
+        const hangarRoof = new THREE.Mesh(new THREE.CylinderGeometry(4.5, 4.5, 12, 16, 1, true, 0, Math.PI), hangarRoofMat);
+        hangarRoof.rotation.z = Math.PI / 2;
+        hangarRoof.rotation.y = Math.PI / 2;
+        hangarRoof.position.set(20, 5, -10);
+        scene.add(hangarRoof);
+
+        // ── GROUND SERVICE VEHICLE (simple truck shape) ───────────────
+        const truckBodyMat = new THREE.MeshStandardMaterial({ color: 0xffcc00, roughness: 0.6 });
+        const truckBody = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.6, 0.7), truckBodyMat);
+        truckBody.position.set(-4, 0.35, 4);
+        truckBody.castShadow = true;
+        scene.add(truckBody);
+        const truckCab = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.5, 0.65), truckBodyMat);
+        truckCab.position.set(-4.55, 0.75, 4);
+        truckCab.castShadow = true;
+        scene.add(truckCab);
+        const truckWheelMat = new THREE.MeshStandardMaterial({ color: 0x111111 });
+        [[-4.5, 4.38], [-4.5, 3.62], [-3.7, 4.38], [-3.7, 3.62]].forEach(([x, z]) => {
+            const w = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.12, 10), truckWheelMat);
+            w.rotation.z = Math.PI / 2;
+            w.position.set(x, 0.18, z);
+            scene.add(w);
+        });
+
+        // ── FUEL BOWSER (tanker truck) ────────────────────────────────
+        const tankerMat = new THREE.MeshStandardMaterial({ color: 0xcc3300, roughness: 0.5 });
+        const tankerBody = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.7, 0.75), tankerMat);
+        tankerBody.position.set(5, 0.4, 4.5);
+        tankerBody.castShadow = true;
+        scene.add(tankerBody);
+        const tankerTank = new THREE.Mesh(new THREE.CylinderGeometry(0.38, 0.38, 1.8, 12), tankerMat);
+        tankerTank.rotation.z = Math.PI / 2;
+        tankerTank.position.set(5, 0.78, 4.5);
+        scene.add(tankerTank);
+
+        // ── SAFETY CONES ─────────────────────────────────────────────
+        const coneMat = new THREE.MeshStandardMaterial({ color: 0xff4400, roughness: 0.7 });
+        [[-2.5, -4], [-3.5, -4], [3.5, -4], [2.5, -4]].forEach(([x, z]) => {
+            const cone = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.35, 8), coneMat);
+            cone.position.set(x, 0.175, z);
+            scene.add(cone);
+            // White stripe on cone
+            const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.102, 0.102, 0.06, 8), new THREE.MeshStandardMaterial({ color: 0xffffff }));
+            stripe.position.set(x, 0.22, z);
+            scene.add(stripe);
+        });
+
+        // ── DISTANCE MARKERS ─────────────────────────────────────────
+        const markerMat = new THREE.MeshStandardMaterial({ color: 0xffdd00 });
+        [-20, -10, 0, 10, 20].forEach(x => {
+            const marker = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.25), markerMat);
+            marker.rotation.x = -Math.PI / 2;
+            marker.position.set(x, 0.003, -9);
+            scene.add(marker);
+        });
+    }
+
+    buildAirport();
