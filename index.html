@@ -60,7 +60,7 @@
         <p>Tambah Elemen:</p>
         <button onclick="addWall()">+ Tambah Dinding</button>
         <button onclick="addRoom()">+ Tambah Ruangan Kubus</button>
-        <button onclick="addPlane()">✈ Tambah Pesawat</button>
+        <button onclick="addPlane()">🛩 Tambah Jet Tempur</button>
         <button onclick="clearScene()" style="background: #ff4f4f;">Hapus Semua</button>
 
         <div class="instruction">
@@ -147,203 +147,334 @@
             objects = [];
         }
 
-        // Fungsi membuat model pesawat komersial yang lebih detail
+        // ============================================================
+        // Model Jet Tempur Detail (F-16/F-22 style)
+        // ============================================================
         function addPlane() {
             const group = new THREE.Group();
 
             // ── Material ──────────────────────────────────────────────
-            const fuselageMat  = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.3, metalness: 0.5 });
-            const wingMat      = new THREE.MeshStandardMaterial({ color: 0xdce3ee, roughness: 0.3, metalness: 0.5 });
-            const engineMat    = new THREE.MeshStandardMaterial({ color: 0x555566, roughness: 0.4, metalness: 0.7 });
-            const engineRimMat = new THREE.MeshStandardMaterial({ color: 0x888899, roughness: 0.3, metalness: 0.8 });
-            const glassMat     = new THREE.MeshStandardMaterial({ color: 0x99ccff, roughness: 0.05, metalness: 0.1, transparent: true, opacity: 0.55 });
-            const accentMat    = new THREE.MeshStandardMaterial({ color: 0x2255cc, roughness: 0.4, metalness: 0.3 });
-            const noseMat      = new THREE.MeshStandardMaterial({ color: 0x222233, roughness: 0.5, metalness: 0.3 });
-            const tireMat      = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9, metalness: 0.0 });
-            const gearMat      = new THREE.MeshStandardMaterial({ color: 0x999999, roughness: 0.4, metalness: 0.8 });
+            const bodyMat       = new THREE.MeshStandardMaterial({ color: 0x8899aa, roughness: 0.35, metalness: 0.70 });
+            const darkMat       = new THREE.MeshStandardMaterial({ color: 0x445566, roughness: 0.40, metalness: 0.60 });
+            const intakeMat     = new THREE.MeshStandardMaterial({ color: 0x222233, roughness: 0.50, metalness: 0.50 });
+            const nozzleMat     = new THREE.MeshStandardMaterial({ color: 0x223344, roughness: 0.30, metalness: 0.90 });
+            const glassMat      = new THREE.MeshStandardMaterial({ color: 0x55aaff, roughness: 0.00, metalness: 0.10, transparent: true, opacity: 0.45 });
+            const accentMat     = new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.40, metalness: 0.30 });
+            const tireMat       = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.90, metalness: 0.00 });
+            const gearMat       = new THREE.MeshStandardMaterial({ color: 0xbbbbbb, roughness: 0.30, metalness: 0.90 });
+            const missileMat    = new THREE.MeshStandardMaterial({ color: 0x667788, roughness: 0.40, metalness: 0.60 });
+            const missileTipMat = new THREE.MeshStandardMaterial({ color: 0xcc3300, roughness: 0.30, metalness: 0.20 });
+            const afterburnMat  = new THREE.MeshStandardMaterial({ color: 0xff6600, roughness: 0.20, metalness: 0.10, emissive: 0xff3300, emissiveIntensity: 0.9, transparent: true, opacity: 0.85 });
+            const innerGlowMat  = new THREE.MeshStandardMaterial({ color: 0xffee00, roughness: 0.10, metalness: 0.00, emissive: 0xffaa00, emissiveIntensity: 1.3, transparent: true, opacity: 0.70 });
 
-            // ── Fuselage — LatheGeometry untuk bentuk aerodinamis ────
-            const profilePts = [
-                new THREE.Vector2(0,    0.01),
-                new THREE.Vector2(0.15, 0.18),
-                new THREE.Vector2(0.5,  0.36),
-                new THREE.Vector2(1.0,  0.44),
-                new THREE.Vector2(2.0,  0.48),
-                new THREE.Vector2(3.5,  0.48),
-                new THREE.Vector2(4.5,  0.46),
-                new THREE.Vector2(5.5,  0.42),
-                new THREE.Vector2(6.2,  0.35),
-                new THREE.Vector2(6.8,  0.25),
-                new THREE.Vector2(7.0,  0.18),
-                new THREE.Vector2(7.1,  0.10),
+            function sh(m) { m.castShadow = true; m.receiveShadow = true; return m; }
+
+            // ── 1. Fuselage ramping (LatheGeometry) ───────────────────
+            const fPts = [
+                new THREE.Vector2(0,    0.008),
+                new THREE.Vector2(0.2,  0.09),
+                new THREE.Vector2(0.55, 0.19),
+                new THREE.Vector2(1.1,  0.25),
+                new THREE.Vector2(2.0,  0.27),
+                new THREE.Vector2(3.0,  0.265),
+                new THREE.Vector2(4.2,  0.26),
+                new THREE.Vector2(5.0,  0.265),
+                new THREE.Vector2(5.7,  0.28),
+                new THREE.Vector2(6.3,  0.30),
+                new THREE.Vector2(6.6,  0.28),
+                new THREE.Vector2(6.85, 0.21),
+                new THREE.Vector2(7.0,  0.13),
             ];
-            const fuselageGeo = new THREE.LatheGeometry(profilePts, 24);
-            const fuselage = new THREE.Mesh(fuselageGeo, fuselageMat);
+            const fuselage = sh(new THREE.Mesh(new THREE.LatheGeometry(fPts, 22), bodyMat));
             fuselage.rotation.z = -Math.PI / 2;
-            fuselage.position.x = -3.55;
+            fuselage.position.x = -3.5;
             group.add(fuselage);
 
-            // ── Stripe livery ─────────────────────────────────────────
-            [0.5, -1.0].forEach(xOff => {
-                const ring = new THREE.Mesh(new THREE.TorusGeometry(0.481, 0.025, 6, 24), accentMat);
-                ring.rotation.y = Math.PI / 2;
-                ring.position.x = xOff;
-                group.add(ring);
+            // ── 2. Pitot tube ─────────────────────────────────────────
+            const pitot = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.025, 0.6, 8), darkMat));
+            pitot.rotation.z = Math.PI / 2;
+            pitot.position.set(3.8, 0.03, 0);
+            group.add(pitot);
+
+            // ── 3. Canopy ─────────────────────────────────────────────
+            const cFrame = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, 0.68, 14), darkMat));
+            cFrame.rotation.z = Math.PI / 2;
+            cFrame.position.set(2.3, 0.25, 0);
+            group.add(cFrame);
+
+            const cGlass = sh(new THREE.Mesh(new THREE.SphereGeometry(0.20, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.52), glassMat));
+            cGlass.rotation.z = -Math.PI / 2;
+            cGlass.position.set(2.3, 0.23, 0);
+            group.add(cGlass);
+
+            const hud = sh(new THREE.Mesh(new THREE.PlaneGeometry(0.14, 0.09),
+                new THREE.MeshStandardMaterial({ color: 0x88ffcc, transparent: true, opacity: 0.35 })));
+            hud.rotation.set(0.4, Math.PI / 2, 0);
+            hud.position.set(2.6, 0.30, 0);
+            group.add(hud);
+
+            // ── 4. LERX Strake ────────────────────────────────────────
+            [-1, 1].forEach(s => {
+                const ss = new THREE.Shape();
+                ss.moveTo( 2.3,  0.0);
+                ss.lineTo( 0.6,  s * 0.65);
+                ss.lineTo( 0.1,  s * 0.85);
+                ss.lineTo(-0.2,  s * 0.70);
+                ss.lineTo( 0.5,  0.0);
+                ss.closePath();
+                const strake = sh(new THREE.Mesh(
+                    new THREE.ExtrudeGeometry(ss, { depth: 0.022, bevelEnabled: false }), bodyMat));
+                strake.rotation.x = -Math.PI / 2;
+                strake.position.set(-0.3, -0.23, 0);
+                group.add(strake);
             });
 
-            // ── Radome (hidung gelap) ─────────────────────────────────
-            const radomeGeo = new THREE.SphereGeometry(0.18, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6);
-            const radome = new THREE.Mesh(radomeGeo, noseMat);
-            radome.rotation.z = -Math.PI / 2;
-            radome.position.set(3.55, 0, 0);
-            group.add(radome);
+            // ── 5. Delta swept wing ───────────────────────────────────
+            [-1, 1].forEach(s => {
+                const ws = new THREE.Shape();
+                ws.moveTo( 0.6,  0.0);
+                ws.lineTo( 1.1,  s * 0.55);
+                ws.lineTo( 0.7,  s * 1.45);
+                ws.lineTo(-0.15, s * 2.55);
+                ws.lineTo(-0.95, s * 2.55);
+                ws.lineTo(-0.75, s * 1.70);
+                ws.lineTo(-0.45, s * 0.90);
+                ws.lineTo(-0.15, s * 0.35);
+                ws.lineTo(-0.05, 0.0);
+                ws.closePath();
+                const wing = sh(new THREE.Mesh(
+                    new THREE.ExtrudeGeometry(ws, { depth: 0.042, bevelEnabled: true, bevelThickness: 0.012, bevelSize: 0.010, bevelSegments: 2 }), bodyMat));
+                wing.rotation.x = -Math.PI / 2;
+                wing.position.set(-0.2, -0.25, 0);
+                group.add(wing);
 
-            // ── Kaca kokpit ───────────────────────────────────────────
-            const cockpitGeo = new THREE.SphereGeometry(0.22, 12, 8, -0.4, 0.8, 0.05, 0.5);
-            const cockpit = new THREE.Mesh(cockpitGeo, glassMat);
-            cockpit.position.set(3.0, 0.38, 0);
-            group.add(cockpit);
-
-            // ── Jendela samping ───────────────────────────────────────
-            for (let i = 0; i < 8; i++) {
-                const winGeo = new THREE.PlaneGeometry(0.18, 0.12);
-                const xPos = 2.4 - i * 0.55;
-                [-1, 1].forEach(side => {
-                    const win = new THREE.Mesh(winGeo, glassMat);
-                    win.position.set(xPos, 0.44, side * 0.481);
-                    win.rotation.y = side * Math.PI / 2;
-                    group.add(win);
-                });
-            }
-
-            // ── Sayap utama (swept, tapered, extruded) ────────────────
-            function makeWing(side) {
-                const s = side;
-                const shape = new THREE.Shape();
-                shape.moveTo( 0.8,  0.0 * s);
-                shape.lineTo( 1.3,  1.0 * s);
-                shape.lineTo( 0.8,  2.2 * s);
-                shape.lineTo(-0.2,  3.0 * s);
-                shape.lineTo(-1.1,  3.0 * s);
-                shape.lineTo(-0.5,  2.2 * s);
-                shape.lineTo( 0.0,  1.0 * s);
-                shape.lineTo(-0.3,  0.0 * s);
-                shape.closePath();
-                const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.055, bevelEnabled: true, bevelThickness: 0.02, bevelSize: 0.015, bevelSegments: 2 });
-                const mesh = new THREE.Mesh(geo, wingMat);
-                mesh.rotation.x = -Math.PI / 2;
-                mesh.position.set(-0.3, -0.38, 0);
-                return mesh;
-            }
-            group.add(makeWing( 1));
-            group.add(makeWing(-1));
-
-            // ── Winglet ───────────────────────────────────────────────
-            [-1, 1].forEach(side => {
-                const wl = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.55, 0.38), wingMat);
-                wl.position.set(-1.1, -0.12, side * 3.02);
-                wl.rotation.x = side * 0.12;
-                wl.rotation.z = 0.08;
-                group.add(wl);
+                const as = new THREE.Shape();
+                as.moveTo(-0.18, s * 1.5);
+                as.lineTo(-0.85, s * 2.5);
+                as.lineTo(-0.95, s * 2.5);
+                as.lineTo(-0.32, s * 1.5);
+                as.closePath();
+                const aileron = sh(new THREE.Mesh(
+                    new THREE.ExtrudeGeometry(as, { depth: 0.046, bevelEnabled: false }), darkMat));
+                aileron.rotation.x = -Math.PI / 2;
+                aileron.position.set(-0.2, -0.248, 0);
+                group.add(aileron);
             });
 
-            // ── Ekor horizontal ───────────────────────────────────────
-            function makeHTail(side) {
-                const s = side;
-                const shape = new THREE.Shape();
-                shape.moveTo( 0.3,  0.0 * s);
-                shape.lineTo( 0.5,  0.6 * s);
-                shape.lineTo( 0.1,  1.2 * s);
-                shape.lineTo(-0.5,  1.2 * s);
-                shape.lineTo(-0.2,  0.6 * s);
-                shape.lineTo(-0.1,  0.0 * s);
-                shape.closePath();
-                const geo = new THREE.ExtrudeGeometry(shape, { depth: 0.04, bevelEnabled: false });
-                const mesh = new THREE.Mesh(geo, wingMat);
-                mesh.rotation.x = -Math.PI / 2;
-                mesh.position.set(-3.2, 0.22, 0);
-                return mesh;
+            // ── 6. Horizontal stabilizer ──────────────────────────────
+            [-1, 1].forEach(s => {
+                const hs = new THREE.Shape();
+                hs.moveTo( 0.22, 0.0);
+                hs.lineTo( 0.42, s * 0.38);
+                hs.lineTo( 0.08, s * 1.05);
+                hs.lineTo(-0.52, s * 1.05);
+                hs.lineTo(-0.28, s * 0.38);
+                hs.lineTo(-0.12, 0.0);
+                hs.closePath();
+                const stab = sh(new THREE.Mesh(
+                    new THREE.ExtrudeGeometry(hs, { depth: 0.032, bevelEnabled: false }), bodyMat));
+                stab.rotation.x = -Math.PI / 2;
+                stab.position.set(-3.05, -0.02, 0);
+                group.add(stab);
+            });
+
+            // ── 7. Twin canted vertical tails ─────────────────────────
+            [-1, 1].forEach(s => {
+                const vs = new THREE.Shape();
+                vs.moveTo( 0.0, 0.0);
+                vs.lineTo( 0.48, 0.45);
+                vs.lineTo( 0.28, 1.18);
+                vs.lineTo(-0.12, 1.18);
+                vs.lineTo(-0.38, 0.45);
+                vs.closePath();
+                const vt = sh(new THREE.Mesh(
+                    new THREE.ExtrudeGeometry(vs, { depth: 0.042, bevelEnabled: false }), bodyMat));
+                vt.rotation.y = Math.PI / 2;
+                vt.rotation.z = s * 0.20;
+                vt.position.set(-3.15, 0.18, s * 0.20);
+                group.add(vt);
+
+                const rs = new THREE.Shape();
+                rs.moveTo(-0.02, 0.28);
+                rs.lineTo( 0.22, 0.45);
+                rs.lineTo( 0.28, 1.18);
+                rs.lineTo(-0.12, 1.18);
+                rs.closePath();
+                const rud = sh(new THREE.Mesh(
+                    new THREE.ExtrudeGeometry(rs, { depth: 0.045, bevelEnabled: false }), darkMat));
+                rud.rotation.y = Math.PI / 2;
+                rud.rotation.z = s * 0.20;
+                rud.position.set(-3.145, 0.18, s * 0.20);
+                group.add(rud);
+            });
+
+            // ── 8. Chin intake (DSI) ──────────────────────────────────
+            const is = new THREE.Shape();
+            is.moveTo( 0.65,  0.0);
+            is.lineTo( 0.65,  0.42);
+            is.lineTo(-0.28,  0.52);
+            is.lineTo(-0.38,  0.0);
+            is.closePath();
+            const intake = sh(new THREE.Mesh(
+                new THREE.ExtrudeGeometry(is, { depth: 0.36, bevelEnabled: true, bevelThickness: 0.018, bevelSize: 0.018, bevelSegments: 3 }), intakeMat));
+            intake.rotation.x = Math.PI / 2;
+            intake.position.set(1.65, -0.24, -0.18);
+            group.add(intake);
+
+            const lip = sh(new THREE.Mesh(new THREE.TorusGeometry(0.18, 0.020, 8, 18, Math.PI), bodyMat));
+            lip.rotation.z = Math.PI / 2;
+            lip.position.set(2.32, -0.26, 0);
+            group.add(lip);
+
+            const splitter = sh(new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.008, 0.34), darkMat));
+            splitter.position.set(1.92, -0.18, 0);
+            group.add(splitter);
+
+            // ── 9. Ventral spine ─────────────────────────────────────
+            const spine = sh(new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.08, 0.18), darkMat));
+            spine.position.set(-0.5, -0.30, 0);
+            group.add(spine);
+
+            // ── 10. Engine + afterburner ──────────────────────────────
+            const pipe = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.27, 2.0, 18), intakeMat));
+            pipe.rotation.z = Math.PI / 2;
+            pipe.position.set(-2.2, 0, 0);
+            group.add(pipe);
+
+            for (let i = 0; i < 10; i++) {
+                const angle = (i / 10) * Math.PI * 2;
+                const petal = sh(new THREE.Mesh(new THREE.BoxGeometry(0.30, 0.048, 0.12), nozzleMat));
+                petal.position.set(-3.28, Math.sin(angle) * 0.25, Math.cos(angle) * 0.25);
+                petal.rotation.x = angle;
+                group.add(petal);
             }
-            group.add(makeHTail( 1));
-            group.add(makeHTail(-1));
 
-            // ── Sirip ekor vertikal ───────────────────────────────────
-            const vShape = new THREE.Shape();
-            vShape.moveTo( 0.0, 0.0);
-            vShape.lineTo( 0.6, 0.6);
-            vShape.lineTo( 0.3, 1.3);
-            vShape.lineTo(-0.3, 1.3);
-            vShape.lineTo(-0.6, 0.6);
-            vShape.closePath();
-            const vTailGeo = new THREE.ExtrudeGeometry(vShape, { depth: 0.05, bevelEnabled: false });
-            const vTail = new THREE.Mesh(vTailGeo, wingMat);
-            vTail.rotation.y = Math.PI / 2;
-            vTail.position.set(-3.4, 0.45, 0.025);
-            group.add(vTail);
+            const abFlame = sh(new THREE.Mesh(new THREE.ConeGeometry(0.21, 0.80, 14), afterburnMat));
+            abFlame.rotation.z = -Math.PI / 2;
+            abFlame.position.set(-3.82, 0, 0);
+            group.add(abFlame);
 
-            // ── Mesin turbofan ────────────────────────────────────────
-            function makeEngine(zPos) {
-                const eng = new THREE.Group();
+            const abInner = sh(new THREE.Mesh(new THREE.ConeGeometry(0.10, 0.55, 12), innerGlowMat));
+            abInner.rotation.z = -Math.PI / 2;
+            abInner.position.set(-3.76, 0, 0);
+            group.add(abInner);
 
-                const nacelle = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.20, 1.1, 18), engineMat);
-                nacelle.rotation.z = Math.PI / 2;
-                eng.add(nacelle);
-
-                const inlet = new THREE.Mesh(new THREE.TorusGeometry(0.24, 0.025, 10, 24), engineRimMat);
-                inlet.rotation.y = Math.PI / 2;
-                inlet.position.x = 0.56;
-                eng.add(inlet);
-
-                const fan = new THREE.Mesh(new THREE.CircleGeometry(0.20, 18),
-                    new THREE.MeshStandardMaterial({ color: 0x334466, metalness: 0.8, roughness: 0.2 }));
-                fan.rotation.y = Math.PI / 2;
-                fan.position.x = 0.55;
-                eng.add(fan);
-
-                const nozzle = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.14, 0.3, 14), engineRimMat);
-                nozzle.rotation.z = Math.PI / 2;
-                nozzle.position.x = -0.7;
-                eng.add(nozzle);
-
-                const pylon = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.12, 0.08), fuselageMat);
-                pylon.position.set(0, 0.22, 0);
-                eng.add(pylon);
-
-                eng.position.set(0.3, -0.55, zPos);
-                eng.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
-                return eng;
-            }
-            group.add(makeEngine( 1.5));
-            group.add(makeEngine(-1.5));
-
-            // ── Landing gear ──────────────────────────────────────────
-            function makeGear(x, z, count) {
-                const g = new THREE.Group();
-                g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.4, 8), gearMat));
-                for (let i = 0; i < count; i++) {
-                    const tire = new THREE.Mesh(new THREE.TorusGeometry(0.11, 0.055, 8, 16), tireMat);
-                    tire.rotation.x = Math.PI / 2;
-                    tire.position.set(0, -0.27, (i - (count - 1) / 2) * 0.18);
-                    g.add(tire);
+            // ── 11. Wingtip missiles ──────────────────────────────────
+            [-1, 1].forEach(s => {
+                const mg = new THREE.Group();
+                mg.add(sh(new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 1.05, 10), missileMat)));
+                const tip = sh(new THREE.Mesh(new THREE.ConeGeometry(0.042, 0.24, 10), missileTipMat));
+                tip.rotation.z = -Math.PI / 2; tip.position.x = 0.645;
+                mg.add(tip);
+                const seekRing = sh(new THREE.Mesh(new THREE.TorusGeometry(0.042, 0.008, 6, 14), darkMat));
+                seekRing.rotation.y = Math.PI / 2; seekRing.position.x = 0.48;
+                mg.add(seekRing);
+                for (let f = 0; f < 4; f++) {
+                    const fa = (f / 4) * Math.PI * 2;
+                    const fin = sh(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.004, 0.08), missileMat));
+                    fin.position.set(-0.38, Math.sin(fa) * 0.065, Math.cos(fa) * 0.065);
+                    fin.rotation.x = fa;
+                    mg.add(fin);
                 }
-                g.position.set(x, -0.68, z);
+                mg.rotation.z = Math.PI / 2;
+                mg.position.set(-0.25, -0.26, s * 2.60);
+                group.add(mg);
+            });
+
+            // ── 12. Drop tanks ────────────────────────────────────────
+            [-1, 1].forEach(s => {
+                const tg = new THREE.Group();
+                tg.add(sh(new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 1.15, 10), darkMat)));
+                [-0.58, 0.58].forEach(xo => {
+                    const cap = sh(new THREE.Mesh(new THREE.SphereGeometry(0.055, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), darkMat));
+                    cap.rotation.z = xo > 0 ? -Math.PI / 2 : Math.PI / 2;
+                    cap.position.x = xo;
+                    tg.add(cap);
+                });
+                const tf = sh(new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.004, 0.07), darkMat));
+                tf.position.set(-0.4, 0.065, 0);
+                tg.add(tf);
+                tg.rotation.z = Math.PI / 2;
+                tg.position.set(0.2, -0.40, s * 1.25);
+                group.add(tg);
+            });
+
+            // ── 13. Gun barrel ────────────────────────────────────────
+            const gun = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.65, 8), nozzleMat));
+            gun.rotation.z = Math.PI / 2;
+            gun.position.set(1.5, -0.14, 0.28);
+            group.add(gun);
+            const gunMuzzle = sh(new THREE.Mesh(new THREE.TorusGeometry(0.018, 0.006, 6, 12), nozzleMat));
+            gunMuzzle.rotation.y = Math.PI / 2;
+            gunMuzzle.position.set(1.83, -0.14, 0.28);
+            group.add(gunMuzzle);
+
+            // ── 14. Panel lines ───────────────────────────────────────
+            const abPanel = sh(new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.010, 0.32), darkMat));
+            abPanel.position.set(-1.6, 0.278, 0);
+            group.add(abPanel);
+            const ngdoor = sh(new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.008, 0.18), darkMat));
+            ngdoor.position.set(2.5, -0.27, 0);
+            group.add(ngdoor);
+
+            // ── 15. Sensor bumps ──────────────────────────────────────
+            [1.9, 0.4, -0.9].forEach(xp => {
+                const bump = sh(new THREE.Mesh(new THREE.SphereGeometry(0.035, 8, 6), darkMat));
+                bump.position.set(xp, 0.288, 0);
+                group.add(bump);
+            });
+            const aoa = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.011, 0.28, 6), darkMat));
+            aoa.rotation.set(0, 0, Math.PI / 2 - 0.25);
+            aoa.position.set(3.15, -0.18, 0.13);
+            group.add(aoa);
+
+            // ── 16. Roundel insignia ──────────────────────────────────
+            [1, -1].forEach(s => {
+                const r1 = sh(new THREE.Mesh(new THREE.CircleGeometry(0.12, 16), accentMat));
+                r1.rotation.y = s * Math.PI / 2;
+                r1.position.set(1.0, 0.01, s * 0.284);
+                group.add(r1);
+                const r2 = sh(new THREE.Mesh(new THREE.CircleGeometry(0.065, 16),
+                    new THREE.MeshStandardMaterial({ color: 0xffffff })));
+                r2.rotation.y = s * Math.PI / 2;
+                r2.position.set(1.0, 0.01, s * 0.285);
+                group.add(r2);
+                const r3 = sh(new THREE.Mesh(new THREE.CircleGeometry(0.028, 16),
+                    new THREE.MeshStandardMaterial({ color: 0x0033aa })));
+                r3.rotation.y = s * Math.PI / 2;
+                r3.position.set(1.0, 0.01, s * 0.286);
+                group.add(r3);
+            });
+
+            // ── 17. Landing gear ──────────────────────────────────────
+            function makeGear(x, z, tireR) {
+                const g = new THREE.Group();
+                g.add(sh(new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.32, 8), gearMat)));
+                const axle = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.013, 0.16, 6), gearMat));
+                axle.rotation.z = Math.PI / 2; axle.position.y = -0.18;
+                g.add(axle);
+                const tire = sh(new THREE.Mesh(new THREE.TorusGeometry(tireR, tireR * 0.44, 8, 16), tireMat));
+                tire.rotation.x = Math.PI / 2; tire.position.y = -0.19;
+                g.add(tire);
+                const brace = sh(new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.20, 6), gearMat));
+                brace.rotation.z = 0.35; brace.position.set(0.05, -0.06, 0);
+                g.add(brace);
+                g.position.set(x, -0.46, z);
                 return g;
             }
-            group.add(makeGear( 2.5,  0.0, 1));
-            group.add(makeGear(-0.8,  0.4, 2));
-            group.add(makeGear(-0.8, -0.4, 2));
+            group.add(makeGear( 2.45,  0.00, 0.068));
+            group.add(makeGear(-0.35,  0.48, 0.088));
+            group.add(makeGear(-0.35, -0.48, 0.088));
 
             // ── Posisi di scene ───────────────────────────────────────
             group.position.set(
-                (Math.random() - 0.5) * 6,
-                1.2,
-                (Math.random() - 0.5) * 6
+                (Math.random() - 0.5) * 8,
+                1.0,
+                (Math.random() - 0.5) * 8
             );
             group.rotation.y = (Math.random() - 0.5) * Math.PI;
 
-            group.traverse(child => {
-                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
-            });
+            group.traverse(c => { if (c.isMesh) { c.castShadow = true; c.receiveShadow = true; } });
 
             scene.add(group);
             objects.push(group);
